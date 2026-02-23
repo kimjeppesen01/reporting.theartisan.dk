@@ -128,7 +128,7 @@ function getAdminAccountId(accountMap) {
  *   uncategorized: [ { id, supplierName, amount, description, date } ]
  * }
  */
-function categorizeBillLines(billLines, accountMap, contactMap) {
+function categorizeBillLines(billLines, accountMap) {
   const overrides = loadOverrides();
   const accountLookup = buildAccountLookup(accountMap);
   const ignoreSet = buildIgnoreSet(accountMap);
@@ -154,8 +154,7 @@ function categorizeBillLines(billLines, accountMap, contactMap) {
     if (amount === 0) return;
 
     const accountId = line.accountId || (line.account && line.account.id);
-    const contactId = line.contactId || (line.contact && line.contact.id);
-    const supplierName = contactMap[contactId] || line.description || 'Unknown';
+    const supplierName = line.contactName || line.description || 'Unknown';
     const lineDate = line.entryDate || line.date || '';
 
     // Skip ignored accounts

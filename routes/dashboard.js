@@ -21,28 +21,27 @@ router.get('/', async (req, res) => {
   const previous = getPreviousPeriodRange(period);
   let error = null;
 
-  let accountMap = {}, contactMap = {};
+  let accountMap = {};
   let billLines = [], prevBillLines = [];
   let invoices = [], prevInvoices = [];
   let groups = {}, uncategorized = [];
   let prevGroups = {};
 
   try {
-    // Fetch reference data + current + previous in parallel
-    [accountMap, contactMap, billLines, prevBillLines, invoices, prevInvoices] = await Promise.all([
+    // Accounts cached; bills+lines and invoices fetched in parallel
+    [accountMap, billLines, prevBillLines, invoices, prevInvoices] = await Promise.all([
       billy.getAccounts(),
-      billy.getContacts(),
-      billy.getBillLines(current.startDate, current.endDate),
-      billy.getBillLines(previous.startDate, previous.endDate),
+      billy.getBillsWithLines(current.startDate, current.endDate),
+      billy.getBillsWithLines(previous.startDate, previous.endDate),
       billy.getInvoices(current.startDate, current.endDate),
       billy.getInvoices(previous.startDate, previous.endDate),
     ]);
 
-    const curr = categorizeBillLines(billLines, accountMap, contactMap);
+    const curr = categorizeBillLines(billLines, accountMap);
     groups = curr.groups;
     uncategorized = curr.uncategorized;
 
-    const prev = categorizeBillLines(prevBillLines, accountMap, contactMap);
+    const prev = categorizeBillLines(prevBillLines, accountMap);
     prevGroups = prev.groups;
 
   } catch (err) {

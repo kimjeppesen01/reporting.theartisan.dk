@@ -7,9 +7,8 @@ const billy = axios.create({
   }
 });
 
-// Simple in-memory cache for accounts/contacts (stable data)
+// In-memory cache for stable reference data
 let _accountsCache = null;
-let _contactsCache = null;
 
 async function getOrganisation() {
   const res = await billy.get('/organization');
@@ -28,21 +27,8 @@ async function getAccounts() {
   return map;
 }
 
-// Returns { contactId: contactName }
-async function getContacts() {
-  if (_contactsCache) return _contactsCache;
-  const res = await billy.get('/contacts', { params: { pageSize: 1000 } });
-  const map = {};
-  (res.data.contacts || []).forEach(c => {
-    map[c.id] = c.name;
-  });
-  _contactsCache = map;
-  return map;
-}
-
 function clearCache() {
   _accountsCache = null;
-  _contactsCache = null;
 }
 
 async function getInvoices(startDate, endDate) {
@@ -57,18 +43,6 @@ async function getInvoices(startDate, endDate) {
   return res.data.invoices || [];
 }
 
-// Invoice lines — for revenue split by account code
-async function getInvoiceLines(startDate, endDate) {
-  const res = await billy.get('/invoiceLines', {
-    params: {
-      minEntryDate: startDate,
-      maxEntryDate: endDate,
-      pageSize: 1000
-    }
-  });
-  return res.data.invoiceLines || [];
-}
-
 async function getBills(startDate, endDate) {
   const res = await billy.get('/bills', {
     params: {
@@ -81,16 +55,49 @@ async function getBills(startDate, endDate) {
   return res.data.bills || [];
 }
 
-// Bill lines — for cost split by account + contact name
-async function getBillLines(startDate, endDate) {
-  const res = await billy.get('/billLines', {
-    params: {
-      minEntryDate: startDate,
-      maxEntryDate: endDate,
-      pageSize: 1000
-    }
-  });
+// Fetch lines for a single bill
+async function _getBillLinesForId(billId) {
+  const res = await billy.get('/billLines', { params: { billId, pageSize: 1000 } });
   return res.data.billLines || [];
+}
+
+/**
+ * Fetch all bill lines for a date range.
+ * Strategy: fetch bills first (has contactName), then batch-fetch their lines.
+ * Returns enriched lines: { id, billId, accountId, contactName, amount, description, date }
+ */
+async function getBillsWithLines(startDate, endDate) {
+  const bills = await getBills(startDate, endDate);
+  if (bills.length === 0) return [];
+
+  // Build billId → { contactName, date } map
+  const billMeta = {};
+  bills.forEach(b => {
+    billMeta[b.id] = { contactName: b.contactName || '', date: b.entryDate || '' };
+  });
+
+  // Batch-fetch lines: 10 bills at a time in parallel
+  const BATCH = 10;
+  const allLines = [];
+  for (let i = 0; i < bills.length; i += BATCH) {
+    const batch = bills.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(b => _getBillLinesForId(b.id)));
+    results.forEach(lines => {
+      lines.forEach(line => {
+        const meta = billMeta[line.billId] || {};
+        allLines.push({
+          id: line.id,
+          billId: line.billId,
+          accountId: line.accountId,
+          contactName: meta.contactName,
+          amount: line.amount || 0,
+          description: line.description || '',
+          date: meta.date,
+        });
+      });
+    });
+  }
+  return allLines;
 }
 
 async function getBankPayments(startDate, endDate) {
@@ -107,11 +114,9 @@ async function getBankPayments(startDate, endDate) {
 module.exports = {
   getOrganisation,
   getAccounts,
-  getContacts,
   clearCache,
   getInvoices,
-  getInvoiceLines,
   getBills,
-  getBillLines,
+  getBillsWithLines,
   getBankPayments,
 };
