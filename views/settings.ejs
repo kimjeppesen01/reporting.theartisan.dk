@@ -1,0 +1,48 @@
+<%- include('layout', { pageTitle: 'Settings — Billy Business Review' }) %>
+
+<% if (noToken) { %>
+  <div class="error-banner">No Billy API token configured. Add your token to the <code>.env</code> file.</div>
+<% } %>
+
+<div class="card" style="max-width: 600px;">
+  <div class="card-header">
+    <h2>API Settings</h2>
+  </div>
+
+  <div class="section-group">
+    <div class="row">
+      <span>API Token</span>
+      <span class="mono"><%= masked %></span>
+    </div>
+    <div class="row">
+      <span>Connection Status</span>
+      <span>
+        <% if (orgName) { %>
+          <span class="badge badge-green">Connected</span>
+        <% } else if (connectionError) { %>
+          <span class="badge badge-red">Error</span>
+        <% } else { %>
+          <span class="badge badge-amber">No Token</span>
+        <% } %>
+      </span>
+    </div>
+    <% if (orgName) { %>
+    <div class="row">
+      <span>Organisation</span>
+      <span><strong><%= orgName %></strong></span>
+    </div>
+    <% } %>
+    <% if (connectionError) { %>
+    <div class="row">
+      <span>Error</span>
+      <span class="text-red"><%= connectionError %></span>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="card-footer">
+    <p>To update your token, edit the <code>.env</code> file via cPanel File Manager and restart the Node.js app.</p>
+  </div>
+</div>
+
+<%- include('footer') %>

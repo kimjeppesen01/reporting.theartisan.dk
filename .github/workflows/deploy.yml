@@ -1,0 +1,52 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -euo pipefail
+
+            cd ~/repositories/reporting.theartisan.dk
+            PREV_SHA="$(git rev-parse --short=12 HEAD)"
+            git fetch origin
+            git reset --hard origin/main
+            TARGET_SHA="$(git rev-parse --short=12 HEAD)"
+            echo "Deploying $TARGET_SHA (previous $PREV_SHA)"
+
+            export PATH=/opt/alt/alt-nodejs22/root/usr/bin:$PATH
+            npm ci --omit=dev || npm install --production
+            mkdir -p tmp && touch tmp/restart.txt
+
+            # Health check with retries
+            for i in $(seq 1 12); do
+              code="$(curl -sS -m 10 -o /dev/null -w "%{http_code}" https://reporting.theartisan.dk/health || true)"
+              if [ "$code" = "200" ]; then
+                echo "PASS health check attempt $i (HTTP 200)"
+                exit 0
+              fi
+              echo "WAIT attempt $i got HTTP $code"
+              sleep 5
+            done
+
+            echo "FAIL health check — rolling back to $PREV_SHA"
+            git reset --hard "$PREV_SHA"
+            npm ci --omit=dev || npm install --production
+            mkdir -p tmp && touch tmp/restart.txt
+            exit 1

@@ -1,0 +1,64 @@
+<div class="card">
+  <div class="card-header">
+    <h2>P&L Report</h2>
+    <div class="period-tabs">
+      <a href="/dashboard?period=weekly" class="tab <%= period === 'weekly' ? 'active' : '' %>">Weekly</a>
+      <a href="/dashboard?period=monthly" class="tab <%= period === 'monthly' ? 'active' : '' %>">Monthly</a>
+      <a href="/dashboard?period=yearly" class="tab <%= period === 'yearly' ? 'active' : '' %>">Yearly</a>
+    </div>
+  </div>
+  <div class="card-subtitle"><%= periodLabel %> &middot; <%= dateRange %></div>
+
+  <div class="section-group">
+    <h3 class="section-label">Revenue</h3>
+    <div class="row revenue">
+      <span>Total Invoiced</span>
+      <span>
+        <%= formatCurrency(totalRevenue) %>
+        <% if (revenueTrend === 'up') { %><span class="trend-up">&uarr;</span>
+        <% } else if (revenueTrend === 'down') { %><span class="trend-down">&darr;</span>
+        <% } else { %><span class="trend-flat">&rarr;</span><% } %>
+      </span>
+    </div>
+    <div class="row revenue">
+      <span>Collected</span>
+      <span><%= formatCurrency(collectedRevenue) %></span>
+    </div>
+    <div class="row revenue muted">
+      <span>Outstanding</span>
+      <span><%= formatCurrency(outstandingRevenue) %></span>
+    </div>
+  </div>
+
+  <div class="section-group">
+    <h3 class="section-label">Expenses</h3>
+    <div class="row expense">
+      <span>Total Bills</span>
+      <span>
+        <%= formatCurrency(totalExpenses) %>
+        <% if (expenseTrend === 'up') { %><span class="trend-up">&uarr;</span>
+        <% } else if (expenseTrend === 'down') { %><span class="trend-down">&darr;</span>
+        <% } else { %><span class="trend-flat">&rarr;</span><% } %>
+      </span>
+    </div>
+    <div class="row expense">
+      <span>Paid</span>
+      <span><%= formatCurrency(paidExpenses) %></span>
+    </div>
+    <div class="row expense muted">
+      <span>Payables</span>
+      <span><%= formatCurrency(outstandingExpenses) %></span>
+    </div>
+  </div>
+
+  <div class="section-group profit-section">
+    <div class="row profit <%= grossProfit >= 0 ? 'positive' : 'negative' %>">
+      <span>Gross Profit</span>
+      <span><%= formatCurrency(grossProfit) %></span>
+    </div>
+    <div class="row profit <%= grossProfit >= 0 ? 'positive' : 'negative' %>">
+      <span>Profit Margin</span>
+      <span><%= formatPercent(profitMargin) %></span>
+    </div>
+  </div>
+</div>

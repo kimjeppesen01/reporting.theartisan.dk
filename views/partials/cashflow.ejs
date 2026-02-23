@@ -1,0 +1,41 @@
+<div class="card">
+  <div class="card-header">
+    <h2>Cashflow Monitor</h2>
+  </div>
+
+  <div class="section-group">
+    <div class="row revenue">
+      <span>Cash In</span>
+      <span><%= formatCurrency(cashIn) %></span>
+    </div>
+    <div class="row expense">
+      <span>Cash Out</span>
+      <span><%= formatCurrency(cashOut) %></span>
+    </div>
+    <hr class="divider">
+    <div class="row profit <%= netCashflow >= 0 ? 'positive' : 'negative' %>">
+      <span>Net Cashflow</span>
+      <span><%= formatCurrency(netCashflow) %></span>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="cashflowChart"
+      data-cash-in="<%= cashIn %>"
+      data-cash-out="<%= cashOut %>">
+    </canvas>
+  </div>
+
+  <div class="section-group">
+    <div class="row">
+      <span class="dot green"></span>
+      <span>Receivables Due</span>
+      <span><%= formatCurrency(outstandingRevenue) %></span>
+    </div>
+    <div class="row">
+      <span class="dot red"></span>
+      <span>Payables Due</span>
+      <span><%= formatCurrency(outstandingExpenses) %></span>
+    </div>
+  </div>
+</div>

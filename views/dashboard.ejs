@@ -1,0 +1,12 @@
+<%- include('layout', { pageTitle: 'Dashboard — Billy Business Review' }) %>
+
+<% if (error) { %>
+  <div class="error-banner"><%= error %></div>
+<% } %>
+
+<div class="dashboard-grid">
+  <%- include('partials/pl-report') %>
+  <%- include('partials/cashflow') %>
+</div>
+
+<%- include('footer') %>
