@@ -1,12 +1,50 @@
-<%- include('layout', { pageTitle: 'Dashboard — Billy Business Review' }) %>
+<%- include('layout', { pageTitle: 'Dashboard — Business Review' }) %>
 
 <% if (error) { %>
   <div class="error-banner"><%= error %></div>
 <% } %>
 
-<div class="dashboard-grid">
-  <%- include('partials/pl-report') %>
-  <%- include('partials/cashflow') %>
+<!-- Top bar: tabs + period selector -->
+<div class="topbar">
+  <div class="business-tabs">
+    <a href="/dashboard?tab=cafe&period=<%= period %>" class="btab <%= tab === 'cafe' ? 'active' : '' %>">
+      ☕ Café
+      <% if (tab === 'cafe' && activeRevenue > 0) { %>
+        <span class="margin-pill <%= grossProfit >= 0 ? 'positive' : 'negative' %>"><%= formatPercent(profitMargin) %></span>
+      <% } %>
+    </a>
+    <a href="/dashboard?tab=events&period=<%= period %>" class="btab <%= tab === 'events' ? 'active' : '' %>">
+      🎪 Events
+    </a>
+    <a href="/dashboard?tab=b2b&period=<%= period %>" class="btab <%= tab === 'b2b' ? 'active' : '' %>">
+      🤝 B2B
+    </a>
+  </div>
+  <div class="period-tabs">
+    <a href="/dashboard?tab=<%= tab %>&period=weekly" class="tab <%= period === 'weekly' ? 'active' : '' %>">Weekly</a>
+    <a href="/dashboard?tab=<%= tab %>&period=monthly" class="tab <%= period === 'monthly' ? 'active' : '' %>">Monthly</a>
+    <a href="/dashboard?tab=<%= tab %>&period=yearly" class="tab <%= period === 'yearly' ? 'active' : '' %>">Yearly</a>
+  </div>
 </div>
+<div class="date-label"><%= periodLabel %> &middot; <%= dateRange %></div>
+
+<!-- Main layout: left panel + right sidebar -->
+<div class="main-layout">
+
+  <!-- LEFT: P&L panel -->
+  <div class="pl-panel">
+    <%- include('partials/pl-report') %>
+  </div>
+
+  <!-- RIGHT: Uncategorized sidebar -->
+  <div class="sidebar">
+    <%- include('partials/uncategorized') %>
+  </div>
+
+</div>
+
+<!-- Pass waterfall data to JS -->
+<script id="waterfall-data" type="application/json"><%- JSON.stringify(waterfallData) %></script>
+<script id="all-categories" type="application/json"><%- JSON.stringify(allCategories) %></script>
 
 <%- include('footer') %>

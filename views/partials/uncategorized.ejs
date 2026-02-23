@@ -1,0 +1,40 @@
+<div class="sidebar-panel">
+  <div class="sidebar-header">
+    <span>Uncategorized</span>
+    <% if (uncategorized.length > 0) { %>
+      <span class="badge badge-red"><%= uncategorized.length %></span>
+    <% } else { %>
+      <span class="badge badge-green">✓ All clear</span>
+    <% } %>
+  </div>
+
+  <% if (uncategorized.length === 0) { %>
+    <div class="sidebar-empty">
+      <div class="sidebar-empty-icon">✓</div>
+      <div>All expenses categorized</div>
+    </div>
+  <% } else { %>
+    <div class="sidebar-list">
+      <% uncategorized.forEach(item => { %>
+        <div class="sidebar-item" id="item-<%= item.id %>">
+          <div class="sidebar-item-top">
+            <span class="sidebar-supplier"><%= item.supplierName %></span>
+            <span class="sidebar-amount"><%= formatCurrency(item.amount) %></span>
+          </div>
+          <% if (item.description && item.description !== item.supplierName) { %>
+            <div class="sidebar-desc"><%= item.description %></div>
+          <% } %>
+          <% if (item.date) { %>
+            <div class="sidebar-date"><%= item.date %></div>
+          <% } %>
+          <select class="assign-select" onchange="assignCategory('<%= item.id %>', this)">
+            <option value="">Assign to category…</option>
+            <% allCategories.forEach(cat => { %>
+              <option value="<%= cat %>"><%= cat %></option>
+            <% }); %>
+          </select>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+</div>

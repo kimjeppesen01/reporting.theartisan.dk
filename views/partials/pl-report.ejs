@@ -1,64 +1,120 @@
-<div class="card">
-  <div class="card-header">
-    <h2>P&L Report</h2>
-    <div class="period-tabs">
-      <a href="/dashboard?period=weekly" class="tab <%= period === 'weekly' ? 'active' : '' %>">Weekly</a>
-      <a href="/dashboard?period=monthly" class="tab <%= period === 'monthly' ? 'active' : '' %>">Monthly</a>
-      <a href="/dashboard?period=yearly" class="tab <%= period === 'yearly' ? 'active' : '' %>">Yearly</a>
-    </div>
-  </div>
-  <div class="card-subtitle"><%= periodLabel %> &middot; <%= dateRange %></div>
-
-  <div class="section-group">
-    <h3 class="section-label">Revenue</h3>
-    <div class="row revenue">
-      <span>Total Invoiced</span>
-      <span>
-        <%= formatCurrency(totalRevenue) %>
-        <% if (revenueTrend === 'up') { %><span class="trend-up">&uarr;</span>
-        <% } else if (revenueTrend === 'down') { %><span class="trend-down">&darr;</span>
-        <% } else { %><span class="trend-flat">&rarr;</span><% } %>
-      </span>
-    </div>
-    <div class="row revenue">
-      <span>Collected</span>
-      <span><%= formatCurrency(collectedRevenue) %></span>
-    </div>
-    <div class="row revenue muted">
-      <span>Outstanding</span>
-      <span><%= formatCurrency(outstandingRevenue) %></span>
+<!-- KPI Hero Cards -->
+<div class="kpi-row">
+  <div class="kpi-card revenue">
+    <div class="kpi-label">Revenue</div>
+    <div class="kpi-value"><%= formatCurrency(activeRevenue) %></div>
+    <div class="kpi-delta <%= revenueTrend === 'up' ? 'positive' : revenueTrend === 'down' ? 'negative' : 'neutral' %>">
+      <% if (prevActiveRevenue > 0) { %>
+        <%= revenueTrend === 'up' ? '↑' : revenueTrend === 'down' ? '↓' : '→' %>
+        <%= formatPercent(Math.abs((activeRevenue - prevActiveRevenue) / prevActiveRevenue * 100)) %> vs last period
+      <% } else { %>
+        — first period
+      <% } %>
     </div>
   </div>
 
-  <div class="section-group">
-    <h3 class="section-label">Expenses</h3>
-    <div class="row expense">
-      <span>Total Bills</span>
-      <span>
-        <%= formatCurrency(totalExpenses) %>
-        <% if (expenseTrend === 'up') { %><span class="trend-up">&uarr;</span>
-        <% } else if (expenseTrend === 'down') { %><span class="trend-down">&darr;</span>
-        <% } else { %><span class="trend-flat">&rarr;</span><% } %>
-      </span>
-    </div>
-    <div class="row expense">
-      <span>Paid</span>
-      <span><%= formatCurrency(paidExpenses) %></span>
-    </div>
-    <div class="row expense muted">
-      <span>Payables</span>
-      <span><%= formatCurrency(outstandingExpenses) %></span>
+  <div class="kpi-card costs">
+    <div class="kpi-label">Total Costs</div>
+    <div class="kpi-value"><%= formatCurrency(totalCosts) %></div>
+    <div class="kpi-delta <%= costTrend === 'up' ? 'negative' : costTrend === 'down' ? 'positive' : 'neutral' %>">
+      <% if (prevTotalCosts > 0) { %>
+        <%= costTrend === 'up' ? '↑' : costTrend === 'down' ? '↓' : '→' %>
+        <%= formatPercent(Math.abs((totalCosts - prevTotalCosts) / prevTotalCosts * 100)) %> vs last period
+      <% } else { %>
+        — first period
+      <% } %>
     </div>
   </div>
 
-  <div class="section-group profit-section">
-    <div class="row profit <%= grossProfit >= 0 ? 'positive' : 'negative' %>">
-      <span>Gross Profit</span>
-      <span><%= formatCurrency(grossProfit) %></span>
-    </div>
-    <div class="row profit <%= grossProfit >= 0 ? 'positive' : 'negative' %>">
-      <span>Profit Margin</span>
-      <span><%= formatPercent(profitMargin) %></span>
+  <div class="kpi-card profit">
+    <div class="kpi-label">Gross Profit</div>
+    <div class="kpi-value <%= grossProfit >= 0 ? 'positive' : 'negative' %>"><%= formatCurrency(grossProfit) %></div>
+    <div class="kpi-delta <%= profitTrend === 'up' ? 'positive' : profitTrend === 'down' ? 'negative' : 'neutral' %>">
+      <% if (activeRevenue > 0) { %>
+        Margin: <strong><%= formatPercent(profitMargin) %></strong>
+      <% } else { %>
+        — no revenue
+      <% } %>
     </div>
   </div>
 </div>
+
+<!-- Waterfall Chart -->
+<% if (tab !== 'events' || activeRevenue > 0) { %>
+<div class="chart-card">
+  <div class="chart-card-header">P&L Waterfall</div>
+  <div class="waterfall-container">
+    <canvas id="waterfallChart"></canvas>
+  </div>
+</div>
+<% } %>
+
+<!-- Events tab: no costs yet -->
+<% if (tab === 'events') { %>
+<div class="info-card">
+  <div class="info-icon">🎪</div>
+  <div class="info-text">
+    <strong>Events Revenue: <%= formatCurrency(activeRevenue) %></strong><br>
+    Cost attribution for events is not yet configured. Contact costs will appear here once event-specific accounts are mapped.
+  </div>
+</div>
+<% } %>
+
+<!-- Cost Group Cards -->
+<% if (tab !== 'events') { %>
+<div class="cost-groups">
+  <div class="cost-groups-header">Cost Breakdown</div>
+
+  <% Object.entries(groups).forEach(([groupKey, group]) => { %>
+    <% if (group.total === 0 && Object.keys(group.categories).length === 0) return; %>
+    <%
+      const delta = costDeltaPct(groupKey);
+      const health = delta > 20 ? 'red' : delta > 0 ? 'amber' : 'green';
+      const pct = totalCosts > 0 ? (group.total / totalCosts * 100) : 0;
+    %>
+    <div class="cost-group health-<%= health %>" data-group="<%= groupKey %>">
+      <div class="cost-group-header" onclick="toggleGroup('<%= groupKey %>')">
+        <div class="cost-group-left">
+          <span class="cost-group-icon"><%= group.icon %></span>
+          <span class="cost-group-label"><%= group.label %></span>
+        </div>
+        <div class="cost-group-right">
+          <div class="cost-group-bar-wrap">
+            <div class="cost-group-bar" style="width:<%= Math.min(pct, 100) %>%"></div>
+          </div>
+          <span class="cost-group-total"><%= formatCurrency(group.total) %></span>
+          <span class="cost-group-chevron" id="chevron-<%= groupKey %>">▶</span>
+        </div>
+      </div>
+
+      <div class="cost-group-body" id="body-<%= groupKey %>" style="display:none">
+        <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
+          <%
+            const catPct = group.total > 0 ? (catData.total / group.total * 100) : 0;
+          %>
+          <div class="cost-category">
+            <div class="cost-category-header" onclick="toggleCategory('<%= groupKey %>-<%= catName.replace(/\s/g,'_') %>')">
+              <span class="cost-category-name"><%= catName %></span>
+              <div class="cost-category-right">
+                <div class="mini-bar-wrap">
+                  <div class="mini-bar" style="width:<%= Math.min(catPct, 100) %>%"></div>
+                </div>
+                <span class="cost-category-total"><%= formatCurrency(catData.total) %></span>
+                <span class="cost-category-pct"><%= formatPercent(catPct) %></span>
+              </div>
+            </div>
+            <div class="cost-lines" id="lines-<%= groupKey %>-<%= catName.replace(/\s/g,'_') %>" style="display:none">
+              <% catData.lines.forEach(line => { %>
+                <div class="cost-line">
+                  <span class="cost-line-supplier"><%= line.supplierName %></span>
+                  <span class="cost-line-amount"><%= formatCurrency(line.amount) %></span>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% }); %>
+</div>
+<% } %>
