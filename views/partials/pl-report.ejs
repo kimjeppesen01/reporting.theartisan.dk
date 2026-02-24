@@ -67,7 +67,7 @@
 
   <% Object.entries(groups).forEach(([groupKey, group]) => { %>
     <% if (!activeCostKeys.includes(groupKey)) return; %>
-    <% if (group.total === 0 && Object.keys(group.categories).length === 0) return; %>
+    <% if (groupKey !== 'labour' && group.total === 0 && Object.keys(group.categories).length === 0) return; %>
     <%
       const delta = costDeltaPct(groupKey);
       const health = delta > 20 ? 'red' : delta > 0 ? 'amber' : 'green';
@@ -89,6 +89,38 @@
       </div>
 
       <div class="cost-group-body" id="body-<%= groupKey %>" style="display:none">
+        <% if (groupKey === 'labour') { %>
+          <% if (group._rawTotal > 0) { %>
+            <div class="labour-dash-meta">
+              Account 1499 total this period: <strong><%= formatCurrency(group._rawTotal) %></strong>
+              &middot; this tab's share: <strong><%= formatCurrency(group.total) %></strong>
+            </div>
+          <% } else { %>
+            <div class="labour-dash-meta labour-dash-nodata">
+              No salary data for account 1499 this period.
+            </div>
+          <% } %>
+          <% if (Object.keys(group.categories).length > 0) { %>
+            <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
+              <% const catPct = group.total > 0 ? (catData.total / group.total * 100) : 0; %>
+              <div class="cost-category">
+                <div class="cost-category-header">
+                  <span class="cost-category-name"><%= catName %></span>
+                  <div class="cost-category-right">
+                    <div class="mini-bar-wrap">
+                      <div class="mini-bar" style="width:<%= Math.min(catPct, 100) %>%"></div>
+                    </div>
+                    <span class="cost-category-total"><%= formatCurrency(catData.total) %></span>
+                    <span class="cost-category-pct"><%= formatPercent(catPct) %></span>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          <% } %>
+          <div class="labour-dash-link">
+            <a href="/labour?period=<%= period %>">Adjust allocations →</a>
+          </div>
+        <% } else { %>
         <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
           <%
             const catPct = group.total > 0 ? (catData.total / group.total * 100) : 0;
@@ -114,6 +146,7 @@
             </div>
           </div>
         <% }); %>
+        <% } %>
       </div>
     </div>
   <% }); %>

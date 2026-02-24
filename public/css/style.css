@@ -536,3 +536,21 @@ body {
 }
 .tab:hover { background: #f1f5f9; color: #1e3a5f; }
 .tab.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+
+/* ── Labour card in dashboard ── */
+.labour-dash-meta {
+  font-size: 0.8125rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.labour-dash-nodata { color: #94a3b8; font-style: italic; }
+.labour-dash-link {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+}
+.labour-dash-link a { color: #0ea5e9; text-decoration: none; }
+.labour-dash-link a:hover { text-decoration: underline; }

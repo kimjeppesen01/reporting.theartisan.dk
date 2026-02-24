@@ -48,19 +48,25 @@ router.get('/', async (req, res) => {
     const prev = categorizeBillLines(prevBillLines, accountMap);
     prevGroups = prev.groups;
 
-    // Extract account 1499 (labour) totals — ignored by categorizer, handled here
+    // Extract account 1499 (labour) totals — from bills AND daybook journal entries
+    // (Danish payroll is often posted as a daybook debit on 1499, not a vendor bill)
     const labourAccId = accountMap[mapping.labour.account]
       ? accountMap[mapping.labour.account].id : null;
     let labourTotal = 0, prevLabourTotal = 0;
     if (labourAccId) {
       billLines.forEach(l => { if (l.accountId === labourAccId) labourTotal += (l.amount || 0); });
       prevBillLines.forEach(l => { if (l.accountId === labourAccId) prevLabourTotal += (l.amount || 0); });
+      // Daybook journal entries: debit side on 1499 = salary expense
+      daybookLines.forEach(l => { if (l.accountId === labourAccId && l.side === 'debit') labourTotal += (l.amount || 0); });
+      prevDaybookLines.forEach(l => { if (l.accountId === labourAccId && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
     }
 
     // Compute labour cost group per tab using saved allocations
     const labourAlloc = loadAllocations();
     groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
     prevGroups.labour = computeLabour(prevLabourTotal, labourAlloc, tab);
+    // Store full-period 1499 total for display in the Labour card
+    groups.labour._rawTotal = labourTotal;
 
   } catch (err) {
     error = 'Could not connect to Billy API. Check your token in Settings.';
@@ -71,8 +77,8 @@ router.get('/', async (req, res) => {
       groups[k] = { label: def.label, icon: def.icon || '📁', total: 0, categories: {} };
       prevGroups[k] = { total: 0, categories: {} };
     });
-    groups.labour     = { label: 'Labour', icon: '👥', total: 0, categories: {} };
-    prevGroups.labour = { label: 'Labour', icon: '👥', total: 0, categories: {} };
+    groups.labour     = { label: 'Labour', icon: '👥', total: 0, categories: {}, _rawTotal: 0 };
+    prevGroups.labour = { label: 'Labour', icon: '👥', total: 0, categories: {}, _rawTotal: 0 };
   }
 
   // Revenue: café from daybook (1111 credits), B2B from invoice totals
