@@ -120,6 +120,14 @@ router.get('/', async (req, res) => {
     daybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') labourTotal += (l.amount || 0); });
     prevDaybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
 
+    // TEMP DEBUG — remove after diagnosis
+    console.log('[LABOUR] 14xx accounts in map:', Object.entries(accountMap).filter(([c]) => c.startsWith('14')).map(([c, a]) => c + '=' + a.id));
+    console.log('[LABOUR] labourAccIds size:', labourAccIds.size, '| labourTotal:', labourTotal, '| prevLabourTotal:', prevLabourTotal);
+    console.log('[LABOUR] bill lines total:', billLines.length, '| daybook lines total:', daybookLines.length);
+    console.log('[LABOUR] matching bill lines:', billLines.filter(l => labourAccIds.has(l.accountId)).length);
+    console.log('[LABOUR] matching daybook lines (all sides):', daybookLines.filter(l => labourAccIds.has(l.accountId)).length);
+    console.log('[LABOUR] sample daybook line:', JSON.stringify(daybookLines[0]));
+
     // Compute labour cost group per tab using saved allocations
     const labourAlloc = loadAllocations();
     groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
