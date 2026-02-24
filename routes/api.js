@@ -24,9 +24,9 @@ router.post('/categorize', (req, res) => {
   }
 });
 
-// POST /api/labour — save labour allocation percentages
+// POST /api/labour — save labour allocation percentages + deduction
 router.post('/labour', (req, res) => {
-  const { tabs, roles } = req.body;
+  const { tabs, roles, deduction } = req.body;
 
   if (tabs) {
     const sum = Object.values(tabs).reduce((s, v) => s + Number(v), 0);
@@ -56,6 +56,7 @@ router.post('/labour', (req, res) => {
             Object.fromEntries(Object.entries(rm).map(([rk, rv]) => [rk, Number(rv)]))
           ]))
         : current.roles,
+      deduction: deduction !== undefined ? Math.max(0, Number(deduction)) : current.deduction,
     };
     saveAllocations(updated);
     res.json({ ok: true });

@@ -139,8 +139,12 @@
         <% if (groupKey === 'labour') { %>
           <% if (group._rawTotal > 0) { %>
             <div class="labour-dash-meta">
-              All payroll accounts (14xx) this period: <strong><%= formatCurrency(group._rawTotal) %></strong>
-              &middot; this tab's share: <strong><%= formatCurrency(group.total) %></strong>
+              All payroll (14xx): <strong><%= formatCurrency(group._rawTotal) %></strong>
+              <% if (group._deduction > 0) { %>
+                &middot; Deduction: <strong style="color:#ef4444">−<%= formatCurrency(group._deduction) %></strong>
+                &middot; Net: <strong><%= formatCurrency(group._netTotal) %></strong>
+              <% } %>
+              &middot; This tab: <strong><%= formatCurrency(group.total) %></strong>
             </div>
           <% } else { %>
             <div class="labour-dash-meta labour-dash-nodata">

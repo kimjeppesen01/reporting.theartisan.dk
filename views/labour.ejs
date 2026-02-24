@@ -11,8 +11,12 @@
   <div>
     <h1 class="labour-title">👥 Labour Allocation</h1>
     <div class="labour-subtitle">
-      Account 1499 total this period:
-      <strong class="labour-total-dkk"><%= formatCurrency(labourTotal) %></strong>
+      All 14xx accounts this period:
+      <strong class="labour-total-dkk"><%= formatCurrency(labourGross) %></strong>
+      <% if (allocations.deduction > 0) { %>
+        &nbsp;·&nbsp; Deduction: <strong style="color:#ef4444"><%= formatCurrency(allocations.deduction) %></strong>
+        &nbsp;·&nbsp; Net: <strong><%= formatCurrency(labourTotal) %></strong>
+      <% } %>
     </div>
   </div>
   <div class="period-tabs">
@@ -23,6 +27,26 @@
 </div>
 
 <form id="labourForm">
+
+  <!-- ══ Section 0: Fixed Deduction ══ -->
+  <div class="labour-card">
+    <div class="labour-card-header">Fixed Deduction</div>
+    <p class="deduction-desc">Subtract a fixed amount from the total before distributing across streams — e.g. another team's salary that shares these accounts.</p>
+    <div class="deduction-row">
+      <label class="deduction-label" for="deductionInput">Deduct (DKK)</label>
+      <input
+        type="number"
+        id="deductionInput"
+        name="deduction"
+        min="0"
+        step="1000"
+        value="<%= allocations.deduction || 0 %>"
+        class="deduction-input"
+        oninput="onDeductionChange()"
+      >
+      <span class="deduction-net">Net: <strong id="deduction-net-display"><%= formatCurrency(labourTotal) %></strong></span>
+    </div>
+  </div>
 
   <!-- ══ Section 1: Business Stream Allocation ══ -->
   <div class="labour-card">
@@ -138,6 +162,7 @@
 </form>
 
 <script id="labour-init" type="application/json"><%- JSON.stringify({
+  labourGross: labourGross,
   labourTotal: labourTotal,
   tabs: ['cafe', 'events', 'b2b', 'webshop']
 }) %></script>
@@ -145,8 +170,17 @@
 <script>
 (function() {
   var cfg = JSON.parse(document.getElementById('labour-init').textContent);
-  var labourTotal = cfg.labourTotal || 0;
+  var labourGross = cfg.labourGross || 0;
   var tabKeys = cfg.tabs;
+
+  function getDeduction() {
+    var el = document.getElementById('deductionInput');
+    return el ? Math.max(0, Number(el.value) || 0) : 0;
+  }
+
+  function getNetTotal() {
+    return Math.max(0, labourGross - getDeduction());
+  }
 
   function fmt(n) {
     return 'DKK\u00a0' + Number(n).toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -158,11 +192,15 @@
   }
 
   function updateAll() {
+    var net = getNetTotal();
+    var netEl = document.getElementById('deduction-net-display');
+    if (netEl) netEl.textContent = fmt(net);
+
     var tabSum = 0;
     tabKeys.forEach(function(t) {
       var pct = getTabPct(t);
       tabSum += pct;
-      var dkk = labourTotal * pct / 100;
+      var dkk = net * pct / 100;
       // Update tab row
       var pctEl = document.getElementById('pct-tab-' + t);
       if (pctEl) pctEl.textContent = pct + '%';
@@ -208,9 +246,11 @@
     if (total) total.textContent = fmt(tabDkk);
   }
 
+  window.onDeductionChange = function() { updateAll(); };
   window.onTabSlider = function(el) { updateAll(); };
   window.onRoleSlider = function(el) {
-    var tabDkk = labourTotal * getTabPct(el.dataset.stream) / 100;
+    var net = getNetTotal();
+    var tabDkk = net * getTabPct(el.dataset.stream) / 100;
     updateRoles(el.dataset.stream, tabDkk);
   };
 
@@ -244,7 +284,7 @@
     fetch('/api/labour', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tabs: tabs, roles: roles })
+      body: JSON.stringify({ tabs: tabs, roles: roles, deduction: getDeduction() })
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {

@@ -124,8 +124,10 @@ router.get('/', async (req, res) => {
     const labourAlloc = loadAllocations();
     groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
     prevGroups.labour = computeLabour(prevLabourTotal, labourAlloc, tab);
-    // Store full-period 14xx total for display in the Labour card
-    groups.labour._rawTotal = labourTotal;
+    // Store gross/net/deduction for display in the Labour card
+    groups.labour._rawTotal  = labourTotal;
+    groups.labour._deduction = labourAlloc.deduction || 0;
+    groups.labour._netTotal  = Math.max(0, labourTotal - (labourAlloc.deduction || 0));
 
     // Salary projection: for current month only, use last month's 14xx total as projected full-month value
     labourProjected = (period === 'monthly' && offset === 0) ? prevLabourTotal : null;

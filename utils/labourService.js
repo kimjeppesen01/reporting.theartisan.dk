@@ -11,6 +11,7 @@ const DEFAULT_ALLOCATIONS = {
     b2b:     { Sales: 40, Roasting: 30, Testing: 15, Packaging: 15 },
     webshop: { Development: 60, 'Packaging/Shipping': 40 },
   },
+  deduction: 0, // Fixed amount subtracted before tab/role distribution (e.g. another team's salary)
 };
 
 function loadAllocations() {
@@ -24,6 +25,7 @@ function loadAllocations() {
         b2b:     Object.assign({}, DEFAULT_ALLOCATIONS.roles.b2b,     (parsed.roles || {}).b2b     || {}),
         webshop: Object.assign({}, DEFAULT_ALLOCATIONS.roles.webshop, (parsed.roles || {}).webshop || {}),
       },
+      deduction: typeof parsed.deduction === 'number' ? parsed.deduction : 0,
     };
   } catch {
     return DEFAULT_ALLOCATIONS;
@@ -36,14 +38,17 @@ function saveAllocations(allocations) {
 
 /**
  * Compute the labour cost group for one tab.
+ * Applies deduction first, then distributes the net total by tab/role %.
  * Returns an object in the same shape as other cost groups in categorizer.js:
  *   { label, icon, total, categories: { RoleName: { total, lines[] } } }
  */
 function computeLabour(labourTotal, allocations, tab) {
-  const tabPct   = (allocations.tabs[tab] || 0) / 100;
-  const tabTotal = labourTotal * tabPct;
-  const roleMap  = allocations.roles[tab] || {};
-  const categories = {};
+  const deduction    = allocations.deduction || 0;
+  const netTotal     = Math.max(0, labourTotal - deduction);
+  const tabPct       = (allocations.tabs[tab] || 0) / 100;
+  const tabTotal     = netTotal * tabPct;
+  const roleMap      = allocations.roles[tab] || {};
+  const categories   = {};
 
   Object.entries(roleMap).forEach(([roleName, rolePct]) => {
     const roleAmount = tabTotal * (rolePct / 100);

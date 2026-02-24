@@ -43,10 +43,12 @@ router.get('/', async (req, res) => {
     console.error('Labour route error:', err.message);
   }
 
+  const allocations = loadAllocations();
   res.render('labour', {
     period,
-    labourTotal,
-    allocations: loadAllocations(),
+    labourGross: labourTotal,
+    labourTotal: Math.max(0, labourTotal - (allocations.deduction || 0)),
+    allocations,
     labourConfig: mapping.labour,
     error,
     saved: req.query.saved === '1',
