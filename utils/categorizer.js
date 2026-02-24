@@ -47,6 +47,15 @@ function buildSupplierLookup() {
 
 const supplierLookup = buildSupplierLookup();
 
+// Find a supplier match: exact first, then contains fallback
+function matchSupplier(supplierName) {
+  const norm = normName(supplierName);
+  if (supplierLookup[norm]) return supplierLookup[norm];
+  // Partial: Billy name contains our lookup key (handles bank-import truncations)
+  const key = Object.keys(supplierLookup).find(k => k.length >= 4 && norm.includes(k));
+  return key ? supplierLookup[key] : null;
+}
+
 // Build account-code → { groupKey, category } lookup (for byAccount groups)
 function buildAccountLookup(accountMap) {
   const lookup = {};
@@ -170,7 +179,7 @@ function categorizeBillLines(billLines, accountMap) {
 
     // Try café account + supplier name lookup
     if (accountId === cafeAccountId) {
-      const match = supplierLookup[normName(supplierName)];
+      const match = matchSupplier(supplierName);
       if (match && match.groupKey === 'cafe') {
         addToGroup(groups, 'cafe', match.category, amount, line.id, supplierName, lineDate);
         return;
@@ -182,7 +191,7 @@ function categorizeBillLines(billLines, accountMap) {
 
     // Try admin account + supplier name lookup
     if (accountId === adminAccountId) {
-      const match = supplierLookup[normName(supplierName)];
+      const match = matchSupplier(supplierName);
       if (match && match.groupKey === 'admin') {
         addToGroup(groups, 'admin', match.category, amount, line.id, supplierName, lineDate);
         return;

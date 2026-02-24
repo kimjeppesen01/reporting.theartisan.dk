@@ -40,7 +40,7 @@
 </div>
 
 <!-- Waterfall Chart -->
-<% if (tab !== 'events' || activeRevenue > 0) { %>
+<% if (activeRevenue > 0 || totalCosts > 0) { %>
 <div class="chart-card">
   <div class="chart-card-header">P&L Waterfall</div>
   <div class="waterfall-container">
@@ -49,23 +49,24 @@
 </div>
 <% } %>
 
-<!-- Events tab: no costs yet -->
-<% if (tab === 'events') { %>
+<!-- No-cost tabs info card -->
+<% if (activeCostKeys.length === 0) { %>
 <div class="info-card">
-  <div class="info-icon">🎪</div>
+  <div class="info-icon"><%= tab === 'events' ? '🎪' : '📊' %></div>
   <div class="info-text">
-    <strong>Events Revenue: <%= formatCurrency(activeRevenue) %></strong><br>
-    Cost attribution for events is not yet configured. Contact costs will appear here once event-specific accounts are mapped.
+    <strong><%= tab === 'events' ? 'Events' : 'Revenue' %>: <%= formatCurrency(activeRevenue) %></strong><br>
+    Cost attribution for this stream is not yet configured.
   </div>
 </div>
 <% } %>
 
 <!-- Cost Group Cards -->
-<% if (tab !== 'events') { %>
+<% if (activeCostKeys.length > 0) { %>
 <div class="cost-groups">
   <div class="cost-groups-header">Cost Breakdown</div>
 
   <% Object.entries(groups).forEach(([groupKey, group]) => { %>
+    <% if (!activeCostKeys.includes(groupKey)) return; %>
     <% if (group.total === 0 && Object.keys(group.categories).length === 0) return; %>
     <%
       const delta = costDeltaPct(groupKey);

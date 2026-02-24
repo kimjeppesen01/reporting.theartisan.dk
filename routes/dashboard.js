@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   const period = ['weekly', 'monthly', 'yearly'].includes(req.query.period)
     ? req.query.period
     : 'monthly';
-  const tab = ['cafe', 'events', 'b2b'].includes(req.query.tab)
+  const tab = ['cafe', 'events', 'b2b', 'webshop'].includes(req.query.tab)
     ? req.query.tab
     : 'cafe';
 
@@ -62,26 +62,37 @@ router.get('/', async (req, res) => {
   const revenue = aggregateRevenue(daybookLines, invoices, accountMap);
   const prevRevenue = aggregateRevenue(prevDaybookLines, prevInvoices, accountMap);
 
-  // Total costs
-  const totalCosts = Object.values(groups).reduce((s, g) => s + g.total, 0);
-  const prevTotalCosts = Object.values(prevGroups).reduce((s, g) => s + g.total, 0);
+  // Cost groups shown per tab
+  const tabCostGroups = {
+    cafe:    ['cafe', 'coffee', 'admin', 'accounting', 'fixed', 'other'],
+    events:  [],
+    b2b:     ['admin', 'fixed'],
+    webshop: ['webshop'],
+  };
+  const activeCostKeys = tabCostGroups[tab] || [];
 
   // Tab-specific revenue
   const tabRevenue = {
-    cafe: revenue.cafe,
-    events: revenue.events,
-    b2b: revenue.b2b_dk + revenue.b2b_eu,
+    cafe:    revenue.cafe,
+    events:  revenue.events,
+    b2b:     revenue.b2b_dk + revenue.b2b_eu,
+    webshop: revenue.webshop,
   };
   const prevTabRevenue = {
-    cafe: prevRevenue.cafe,
-    events: prevRevenue.events,
-    b2b: prevRevenue.b2b_dk + prevRevenue.b2b_eu,
+    cafe:    prevRevenue.cafe,
+    events:  prevRevenue.events,
+    b2b:     prevRevenue.b2b_dk + prevRevenue.b2b_eu,
+    webshop: prevRevenue.webshop,
   };
 
   const activeRevenue = tabRevenue[tab] || 0;
   const prevActiveRevenue = prevTabRevenue[tab] || 0;
 
-  // Gross profit (café tab uses all costs; other tabs show shared costs)
+  // Tab-specific costs (only the groups that belong to this tab)
+  const totalCosts = activeCostKeys.reduce((s, k) => s + (groups[k] ? groups[k].total : 0), 0);
+  const prevTotalCosts = activeCostKeys.reduce((s, k) => s + (prevGroups[k] ? prevGroups[k].total : 0), 0);
+
+  // Gross profit
   const grossProfit = activeRevenue - totalCosts;
   const prevGrossProfit = prevActiveRevenue - prevTotalCosts;
   const profitMargin = activeRevenue > 0 ? (grossProfit / activeRevenue) * 100 : 0;
@@ -101,10 +112,11 @@ router.get('/', async (req, res) => {
     return ((curr - prev) / prev) * 100;
   }
 
-  // Waterfall data for chart
+  // Waterfall data — only the cost groups for this tab
+  const activeGroups = activeCostKeys.map(k => groups[k]).filter(g => g && g.total > 0);
   const waterfallData = {
-    labels: ['Revenue', ...Object.values(groups).filter(g => g.total > 0).map(g => g.label), 'Gross Profit'],
-    values: [activeRevenue, ...Object.values(groups).filter(g => g.total > 0).map(g => -g.total), grossProfit],
+    labels: ['Revenue', ...activeGroups.map(g => g.label), 'Gross Profit'],
+    values: [activeRevenue, ...activeGroups.map(g => -g.total), grossProfit],
   };
 
   res.render('dashboard', {
@@ -119,6 +131,7 @@ router.get('/', async (req, res) => {
     revenueTrend: trend(activeRevenue, prevActiveRevenue),
     // Costs
     groups, prevGroups, totalCosts, prevTotalCosts,
+    activeCostKeys,
     costTrend: trend(totalCosts, prevTotalCosts),
     costDeltaPct,
     // P&L

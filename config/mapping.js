@@ -16,6 +16,7 @@ module.exports = {
   costs: {
 
     // Café food/drink supplies — account 1211, grouped by contact name
+    // Names must match Billy contact names (case-insensitive, partial/contains also supported)
     cafe: {
       account: '1211',
       label: 'Café Costs',
@@ -23,21 +24,26 @@ module.exports = {
       categories: {
         'Bread': [
           'Københavns Bageri ApS',
+          'Copenhagen Bakery',        // Billy bank-import name
           'Bagel Belly',
           'Gluten Tag',
         ],
         'Ingredients': [
           'Salling group A/S',
           'HØRKRAM FOODSERVICE A/S',
+          'HØRKRAM FOODSERVICE',      // partial: matches "LS  HØRKRAM FOODSERVICE A"
           'FÆRM ApS',
           'TH-Juice ApS',
+          'Food',                     // generic description fallback
         ],
         'Tea': [
           'Sing Tehus',
           'Mushroom Alchemy',
+          'mushroomalchemy',          // partial: matches "www.mushroomalchemy.eu"
         ],
         'Soft Drinks': [
           'Beverage Collection ApS',
+          'Beverage (juice)',         // Billy bank-import description
         ],
       },
     },
@@ -60,8 +66,14 @@ module.exports = {
       label: 'Admin & Marketing',
       icon: '💼',
       categories: {
-        'Admin': ['Microsoft'],
-        'Marketing': ['Canva Pty Ltd', 'Claude'],
+        'Admin': [
+          'Microsoft',               // exact: also matches "MICROSOFTÆG..." via contains
+        ],
+        'Marketing': [
+          'Canva Pty Ltd',
+          'Claude',
+          'CLAUDE.AI',               // partial: matches "CLAUDE.AI SUBSCRIPTION"
+        ],
       },
       // Extra accounts that roll into a sub-category
       extraAccounts: {

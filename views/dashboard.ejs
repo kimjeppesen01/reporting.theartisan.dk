@@ -19,6 +19,12 @@
     <a href="/dashboard?tab=b2b&period=<%= period %>" class="btab <%= tab === 'b2b' ? 'active' : '' %>">
       🤝 B2B
     </a>
+    <a href="/dashboard?tab=webshop&period=<%= period %>" class="btab <%= tab === 'webshop' ? 'active' : '' %>">
+      🛒 Webshop
+      <% if (tab === 'webshop' && activeRevenue > 0) { %>
+        <span class="margin-pill <%= grossProfit >= 0 ? 'positive' : 'negative' %>"><%= formatPercent(profitMargin) %></span>
+      <% } %>
+    </a>
   </div>
   <div class="period-tabs">
     <a href="/dashboard?tab=<%= tab %>&period=weekly" class="tab <%= period === 'weekly' ? 'active' : '' %>">Weekly</a>
