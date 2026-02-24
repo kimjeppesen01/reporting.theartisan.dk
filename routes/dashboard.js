@@ -121,7 +121,7 @@ router.get('/', async (req, res) => {
     prevDaybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
 
     // TEMP DEBUG — remove after diagnosis
-    require('fs').writeFileSync('/tmp/labour-debug.json', JSON.stringify({
+    require('fs').writeFileSync(require('path').join(__dirname, '../labour-debug.json'), JSON.stringify({
       accounts14xx: Object.entries(accountMap).filter(([c]) => c.startsWith('14')).map(([c, a]) => ({ code: c, id: a.id, name: a.name })),
       labourAccIdsSize: labourAccIds.size,
       labourTotal,
