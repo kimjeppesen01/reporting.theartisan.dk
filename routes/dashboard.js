@@ -24,17 +24,20 @@ router.get('/', async (req, res) => {
   let accountMap = {};
   let billLines = [], prevBillLines = [];
   let daybookLines = [], prevDaybookLines = [];
+  let invoices = [], prevInvoices = [];
   let groups = {}, uncategorized = [];
   let prevGroups = {};
 
   try {
-    // Accounts cached; bills+lines and daybook lines fetched in parallel
-    [accountMap, billLines, prevBillLines, daybookLines, prevDaybookLines] = await Promise.all([
+    // Fetch all data in parallel
+    [accountMap, billLines, prevBillLines, daybookLines, prevDaybookLines, invoices, prevInvoices] = await Promise.all([
       billy.getAccounts(),
       billy.getBillsWithLines(current.startDate, current.endDate),
       billy.getBillsWithLines(previous.startDate, previous.endDate),
       billy.getDaybookLinesForRevenue(current.startDate, current.endDate),
       billy.getDaybookLinesForRevenue(previous.startDate, previous.endDate),
+      billy.getInvoices(current.startDate, current.endDate),
+      billy.getInvoices(previous.startDate, previous.endDate),
     ]);
 
     const curr = categorizeBillLines(billLines, accountMap);
@@ -55,9 +58,9 @@ router.get('/', async (req, res) => {
     });
   }
 
-  // Revenue by stream (from daybook credit-side lines on revenue accounts)
-  const revenue = aggregateRevenue(daybookLines, accountMap);
-  const prevRevenue = aggregateRevenue(prevDaybookLines, accountMap);
+  // Revenue: café from daybook (1111 credits), B2B from invoice totals
+  const revenue = aggregateRevenue(daybookLines, invoices, accountMap);
+  const prevRevenue = aggregateRevenue(prevDaybookLines, prevInvoices, accountMap);
 
   // Total costs
   const totalCosts = Object.values(groups).reduce((s, g) => s + g.total, 0);

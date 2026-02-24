@@ -238,27 +238,36 @@ function findGroupForCategory(categoryName) {
 }
 
 /**
- * Aggregate daybook transaction lines by revenue account code.
- * Uses credit-side lines on known revenue accounts.
+ * Aggregate revenue from two sources:
+ *  - daybookLines: credit-side entries on known revenue accounts (1111 café via Zettle)
+ *  - invoices: approved invoice totals counted as b2b_dk revenue
  * Returns { cafe, events, webshop, b2b_dk, b2b_eu, total }
  */
-function aggregateRevenue(daybookLines, accountMap) {
+function aggregateRevenue(daybookLines, invoices, accountMap) {
   const rev = mapping.revenue;
   const result = { cafe: 0, events: 0, webshop: 0, b2b_dk: 0, b2b_eu: 0, total: 0 };
 
-  // Build accountId → streamKey map
+  // Build accountId → streamKey map (for daybook-sourced streams)
   const streamMap = {};
   Object.entries(rev).forEach(([key, code]) => {
     const acc = accountMap[code];
     if (acc) streamMap[acc.id] = key;
   });
 
-  daybookLines.forEach(line => {
+  // Café (and any future daybook-sourced streams) from daybook credits
+  (daybookLines || []).forEach(line => {
     if (line.side !== 'credit') return;
     const stream = streamMap[line.accountId];
     if (!stream) return;
     const amount = line.amount || 0;
     result[stream] = (result[stream] || 0) + amount;
+    result.total += amount;
+  });
+
+  // B2B revenue from invoices
+  (invoices || []).forEach(inv => {
+    const amount = inv.amount || 0;
+    result.b2b_dk += amount;
     result.total += amount;
   });
 
