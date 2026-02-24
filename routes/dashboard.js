@@ -6,6 +6,60 @@ const { getRangeForPeriod, getPreviousPeriodRange, getPeriodLabel } = require('.
 const { formatCurrency, formatPercent } = require('../utils/formatters');
 const mapping = require('../config/mapping');
 
+/**
+ * Bucket cashflow by time granularity:
+ *   weekly  → 7 daily buckets (Mon–Sun)
+ *   monthly → 5 weekly buckets (Wk 1–5)
+ *   yearly  → 12 monthly buckets (Jan–Dec)
+ * Returns { labels[], inflow[], outflow[], net[] }
+ */
+function bucketCashflow(period, daybookLines, billLines, invoices, accountMap) {
+  const revenueAccIds = new Set(
+    Object.values(mapping.revenue)
+      .map(code => accountMap[code] ? accountMap[code].id : null)
+      .filter(Boolean)
+  );
+
+  let n, labels, getBucket;
+  if (period === 'weekly') {
+    n = 7;
+    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    getBucket = s => { const d = new Date(s).getDay(); return d === 0 ? 6 : d - 1; };
+  } else if (period === 'monthly') {
+    n = 5;
+    labels = ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5'];
+    getBucket = s => Math.min(Math.floor((new Date(s).getDate() - 1) / 7), 4);
+  } else {
+    n = 12;
+    labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    getBucket = s => new Date(s).getMonth();
+  }
+
+  const inflow = Array(n).fill(0);
+  const outflow = Array(n).fill(0);
+
+  daybookLines.forEach(l => {
+    if (l.side !== 'credit' || !revenueAccIds.has(l.accountId) || !l.date) return;
+    const b = getBucket(l.date);
+    if (b >= 0 && b < n) inflow[b] += l.amount;
+  });
+
+  invoices.forEach(inv => {
+    const d = (inv.entryDate || inv.createdTime || '').slice(0, 10);
+    if (!d) return;
+    const b = getBucket(d);
+    if (b >= 0 && b < n) inflow[b] += (inv.amount || 0);
+  });
+
+  billLines.forEach(l => {
+    if (!l.date) return;
+    const b = getBucket(l.date);
+    if (b >= 0 && b < n) outflow[b] += l.amount;
+  });
+
+  return { labels, inflow, outflow, net: inflow.map((v, i) => v - outflow[i]) };
+}
+
 router.get('/', async (req, res) => {
   const period = ['weekly', 'monthly', 'yearly'].includes(req.query.period)
     ? req.query.period
@@ -142,6 +196,20 @@ router.get('/', async (req, res) => {
     values: [activeRevenue, ...activeGroups.map(g => -g.total), grossProfit],
   };
 
+  // Cashflow timeline — bucketed by period granularity (business-wide, not tab-specific)
+  const cashflowTimeline = bucketCashflow(period, daybookLines, billLines, invoices, accountMap);
+  const cfInTotal  = cashflowTimeline.inflow.reduce((a, b) => a + b, 0);
+  const cfOutTotal = cashflowTimeline.outflow.reduce((a, b) => a + b, 0);
+  const startD = new Date(current.startDate);
+  const endD   = new Date(current.endDate);
+  const daysInPeriod = Math.ceil((endD - startD) / 86400000) + 1;
+  const cashflowKpis = {
+    totalInflow:  cfInTotal,
+    totalOutflow: cfOutTotal,
+    netCF:        cfInTotal - cfOutTotal,
+    dailyBurn:    daysInPeriod > 0 ? cfOutTotal / daysInPeriod : 0,
+  };
+
   res.render('dashboard', {
     period,
     tab,
@@ -165,6 +233,9 @@ router.get('/', async (req, res) => {
     allCategories: mapping.allCategories,
     // Waterfall
     waterfallData,
+    // Cashflow Command Center
+    cashflowTimeline,
+    cashflowKpis,
     // Helpers
     formatCurrency, formatPercent,
   });

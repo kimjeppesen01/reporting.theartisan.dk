@@ -1,0 +1,90 @@
+<section class="cf-section">
+  <div class="cf-header">Cashflow Command Center</div>
+
+  <!-- KPI mini-cards -->
+  <div class="cf-kpis">
+
+    <div class="cf-kpi">
+      <div class="cf-kpi-top">
+        <div class="cf-kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <span class="cf-kpi-label">Total Inflow</span>
+      </div>
+      <p class="cf-kpi-value positive"><%= formatCurrency(cashflowKpis.totalInflow) %></p>
+    </div>
+
+    <div class="cf-kpi">
+      <div class="cf-kpi-top">
+        <div class="cf-kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10"/><path d="M17 7v10H7"/></svg>
+        </div>
+        <span class="cf-kpi-label">Total Outflow</span>
+      </div>
+      <p class="cf-kpi-value negative"><%= formatCurrency(cashflowKpis.totalOutflow) %></p>
+    </div>
+
+    <div class="cf-kpi">
+      <div class="cf-kpi-top">
+        <div class="cf-kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <span class="cf-kpi-label">Net Cashflow</span>
+      </div>
+      <p class="cf-kpi-value <%= cashflowKpis.netCF >= 0 ? 'positive' : 'negative' %>">
+        <%= formatCurrency(cashflowKpis.netCF) %>
+      </p>
+    </div>
+
+    <div class="cf-kpi">
+      <div class="cf-kpi-top">
+        <div class="cf-kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+        </div>
+        <span class="cf-kpi-label">Daily Burn</span>
+      </div>
+      <p class="cf-kpi-value"><%= formatCurrency(cashflowKpis.dailyBurn) %></p>
+      <p class="cf-kpi-sub">avg per day</p>
+    </div>
+
+  </div>
+
+  <!-- Charts -->
+  <div class="cf-charts">
+
+    <!-- Inflow vs Outflow area chart -->
+    <div class="cf-chart-card cf-chart-wide">
+      <div class="cf-chart-head">
+        <h3 class="cf-chart-title">Inflow vs Outflow</h3>
+        <div class="cf-chart-legend">
+          <span class="cf-legend-dot positive"></span><span>Inflow</span>
+          <span class="cf-legend-dot negative"></span><span>Outflow</span>
+        </div>
+      </div>
+      <div class="cf-canvas-wrap">
+        <canvas id="cfAreaChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Net Cashflow bar chart -->
+    <div class="cf-chart-card cf-chart-narrow">
+      <div class="cf-chart-head">
+        <h3 class="cf-chart-title">Net Cashflow</h3>
+        <svg class="cf-trend-icon <%= cashflowKpis.netCF >= 0 ? 'positive' : 'negative' %>" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <% if (cashflowKpis.netCF >= 0) { %>
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+          <% } else { %>
+            <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>
+          <% } %>
+        </svg>
+      </div>
+      <div class="cf-canvas-wrap">
+        <canvas id="cfNetChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+
+<script id="cashflow-timeline" type="application/json"><%- JSON.stringify(cashflowTimeline) %></script>

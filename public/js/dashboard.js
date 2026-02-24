@@ -46,6 +46,178 @@ function assignCategory(billLineId, selectEl) {
   });
 }
 
+/* ── Shared DKK formatter ── */
+function dkkTick(v) {
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  if (v >= 1000)    return (v / 1000).toFixed(0) + 'k';
+  return String(v);
+}
+
+/* ── Operating Expenses Donut Chart ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var canvas  = document.getElementById('opexDonut');
+  var dataEl  = document.getElementById('opex-donut-data');
+  if (!canvas || !dataEl) return;
+
+  var d;
+  try { d = JSON.parse(dataEl.textContent); } catch(e) { return; }
+
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        data: d.values,
+        backgroundColor: d.colors,
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var pct = d.total > 0 ? (ctx.raw / d.total * 100).toFixed(1) : 0;
+              return ' ' + ctx.label + ': DKK ' + ctx.raw.toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+/* ── Cashflow Area + Bar Charts ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var timelineEl = document.getElementById('cashflow-timeline');
+  if (!timelineEl) return;
+
+  var cf;
+  try { cf = JSON.parse(timelineEl.textContent); } catch(e) { return; }
+
+  var POSITIVE = '#16a34a';
+  var NEGATIVE = '#dc2626';
+
+  /* Inflow vs Outflow area chart */
+  var areaCanvas = document.getElementById('cfAreaChart');
+  if (areaCanvas) {
+    new Chart(areaCanvas, {
+      type: 'line',
+      data: {
+        labels: cf.labels,
+        datasets: [
+          {
+            label: 'Inflow',
+            data: cf.inflow,
+            borderColor: POSITIVE,
+            borderWidth: 2,
+            backgroundColor: 'rgba(22,163,74,0.12)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: POSITIVE,
+          },
+          {
+            label: 'Outflow',
+            data: cf.outflow,
+            borderColor: NEGATIVE,
+            borderWidth: 2,
+            backgroundColor: 'rgba(220,38,38,0.08)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: NEGATIVE,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: function(ctx) {
+                return ' ' + ctx.dataset.label + ': DKK ' + (ctx.raw || 0).toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: '#f1f5f9' },
+            ticks: { font: { size: 11 }, color: '#94a3b8' }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#f1f5f9', drawBorder: false },
+            ticks: {
+              callback: function(v) { return dkkTick(v); },
+              font: { size: 11 }, color: '#94a3b8'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /* Net Cashflow bar chart */
+  var netCanvas = document.getElementById('cfNetChart');
+  if (netCanvas) {
+    var netColors = cf.net.map(function(v) {
+      return v >= 0 ? 'rgba(30,58,95,0.85)' : 'rgba(220,38,38,0.75)';
+    });
+    new Chart(netCanvas, {
+      type: 'bar',
+      data: {
+        labels: cf.labels,
+        datasets: [{
+          label: 'Net',
+          data: cf.net,
+          backgroundColor: netColors,
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return ' Net: DKK ' + (ctx.raw || 0).toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, color: '#94a3b8' }
+          },
+          y: {
+            grid: { color: '#f1f5f9', drawBorder: false },
+            ticks: {
+              callback: function(v) { return dkkTick(v); },
+              font: { size: 11 }, color: '#94a3b8'
+            }
+          }
+        }
+      }
+    });
+  }
+});
+
 /* ── Waterfall Chart ── */
 document.addEventListener('DOMContentLoaded', function() {
   var canvas = document.getElementById('waterfallChart');

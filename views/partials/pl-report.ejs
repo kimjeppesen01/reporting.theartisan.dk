@@ -49,6 +49,53 @@
 </div>
 <% } %>
 
+<!-- Operating Expenses donut -->
+<% if (activeCostKeys.length > 0 && totalCosts > 0) { %>
+<%
+  const DONUT_COLORS = ['#1e3a5f','#0ea5e9','#16a34a','#d97706','#7c3aed','#ec4899'];
+  const donutGroups = activeCostKeys
+    .map(k => groups[k])
+    .filter(g => g && g.total > 0);
+  const donutData = {
+    labels: donutGroups.map(g => g.label),
+    values: donutGroups.map(g => g.total),
+    colors: donutGroups.map((_, i) => DONUT_COLORS[i % DONUT_COLORS.length]),
+    total:  totalCosts,
+  };
+%>
+<div class="opex-section">
+  <div class="opex-header">Operating Expenses</div>
+  <div class="opex-card">
+    <div class="opex-donut-wrap">
+      <canvas id="opexDonut"></canvas>
+      <div class="opex-donut-center">
+        <span class="opex-donut-label">Total</span>
+        <span class="opex-donut-total"><%= formatCurrency(totalCosts) %></span>
+      </div>
+    </div>
+    <div class="opex-legend">
+      <% donutGroups.forEach(function(g, i) { %>
+        <% const pct = totalCosts > 0 ? (g.total / totalCosts * 100) : 0; %>
+        <div class="opex-legend-item">
+          <div class="opex-dot" style="background:<%= DONUT_COLORS[i % DONUT_COLORS.length] %>"></div>
+          <div class="opex-legend-body">
+            <div class="opex-legend-top">
+              <span class="opex-legend-name"><%= g.label %></span>
+              <span class="opex-legend-amount"><%= formatCurrency(g.total) %></span>
+            </div>
+            <div class="opex-mini-bar-wrap">
+              <div class="opex-mini-bar" style="background:<%= DONUT_COLORS[i % DONUT_COLORS.length] %>;width:<%= Math.min(pct,100) %>%"></div>
+            </div>
+            <p class="opex-legend-pct"><%= formatPercent(pct) %> of total</p>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</div>
+<script id="opex-donut-data" type="application/json"><%- JSON.stringify(donutData) %></script>
+<% } %>
+
 <!-- No-cost tabs info card -->
 <% if (activeCostKeys.length === 0) { %>
 <div class="info-card">
