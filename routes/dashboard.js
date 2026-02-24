@@ -67,13 +67,15 @@ router.get('/', async (req, res) => {
   const tab = ['cafe', 'events', 'b2b', 'webshop'].includes(req.query.tab)
     ? req.query.tab
     : 'cafe';
+  // offset: 0 = current period, -1 = prev, -2 = two ago, etc. Block future periods.
+  const offset = Math.min(0, parseInt(req.query.offset) || 0);
 
   if (!process.env.BILLY_API_TOKEN) {
     return res.redirect('/settings?error=no_token');
   }
 
-  const current = getRangeForPeriod(period);
-  const previous = getPreviousPeriodRange(period);
+  const current = getRangeForPeriod(period, offset);
+  const previous = getPreviousPeriodRange(period, offset);
   let error = null;
 
   let accountMap = {};
@@ -213,7 +215,8 @@ router.get('/', async (req, res) => {
   res.render('dashboard', {
     period,
     tab,
-    periodLabel: getPeriodLabel(period),
+    periodLabel: getPeriodLabel(period, offset),
+    offset,
     dateRange: `${current.startDate} — ${current.endDate}`,
     error,
     // Revenue
