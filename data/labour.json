@@ -1,0 +1,32 @@
+{
+  "tabs": {
+    "cafe": 25,
+    "events": 25,
+    "b2b": 25,
+    "webshop": 25
+  },
+  "roles": {
+    "cafe": {
+      "Operations": 40,
+      "Management": 20,
+      "Production": 20,
+      "Marketing": 10,
+      "Cleaning": 10
+    },
+    "events": {
+      "Operations": 40,
+      "Planning": 30,
+      "Production": 30
+    },
+    "b2b": {
+      "Sales": 40,
+      "Roasting": 30,
+      "Testing": 15,
+      "Packaging": 15
+    },
+    "webshop": {
+      "Development": 60,
+      "Packaging/Shipping": 40
+    }
+  }
+}

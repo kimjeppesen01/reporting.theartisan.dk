@@ -14,6 +14,7 @@ app.use('/', require('./routes/index'));
 app.use('/api', require('./routes/api'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/settings', require('./routes/settings'));
+app.use('/labour', require('./routes/labour'));
 app.use('/health', require('./routes/health'));
 
 const PORT = process.env.PORT || 3000;

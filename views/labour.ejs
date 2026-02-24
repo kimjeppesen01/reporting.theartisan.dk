@@ -1,0 +1,275 @@
+<%- include('layout', { pageTitle: 'Labour Allocation' }) %>
+
+<% if (error) { %>
+  <div class="error-banner"><%= error %></div>
+<% } %>
+<% if (saved) { %>
+  <div class="success-banner">✓ Allocations saved.</div>
+<% } %>
+
+<div class="labour-header">
+  <div>
+    <h1 class="labour-title">👥 Labour Allocation</h1>
+    <div class="labour-subtitle">
+      Account 1499 total this period:
+      <strong class="labour-total-dkk"><%= formatCurrency(labourTotal) %></strong>
+    </div>
+  </div>
+  <div class="period-tabs">
+    <a href="/labour?period=weekly"  class="tab <%= period === 'weekly'  ? 'active' : '' %>">Weekly</a>
+    <a href="/labour?period=monthly" class="tab <%= period === 'monthly' ? 'active' : '' %>">Monthly</a>
+    <a href="/labour?period=yearly"  class="tab <%= period === 'yearly'  ? 'active' : '' %>">Yearly</a>
+  </div>
+</div>
+
+<form id="labourForm">
+
+  <!-- ══ Section 1: Business Stream Allocation ══ -->
+  <div class="labour-card">
+    <div class="labour-card-header">
+      <span>Business Stream Allocation</span>
+      <span id="tab-sum-badge" class="badge badge-green">100%</span>
+    </div>
+
+    <!-- Proportional colour bar -->
+    <div class="stream-bar-wrap">
+      <div class="stream-bar-segment" id="bar-cafe"    style="background:#1e3a5f"></div>
+      <div class="stream-bar-segment" id="bar-events"  style="background:#0ea5e9"></div>
+      <div class="stream-bar-segment" id="bar-b2b"     style="background:#8b5cf6"></div>
+      <div class="stream-bar-segment" id="bar-webshop" style="background:#f59e0b"></div>
+    </div>
+    <div class="stream-bar-legend">
+      <span><span class="legend-dot" style="background:#1e3a5f"></span>Café</span>
+      <span><span class="legend-dot" style="background:#0ea5e9"></span>Events</span>
+      <span><span class="legend-dot" style="background:#8b5cf6"></span>B2B</span>
+      <span><span class="legend-dot" style="background:#f59e0b"></span>Webshop</span>
+    </div>
+
+    <div class="alloc-rows">
+      <% [
+        { key: 'cafe',    label: '☕ Café',    color: '#1e3a5f' },
+        { key: 'events',  label: '🎪 Events',  color: '#0ea5e9' },
+        { key: 'b2b',     label: '🤝 B2B',     color: '#8b5cf6' },
+        { key: 'webshop', label: '🛒 Webshop', color: '#f59e0b' },
+      ].forEach(function(s) { %>
+        <div class="alloc-row">
+          <span class="alloc-label"><%= s.label %></span>
+          <input
+            type="range"
+            class="alloc-slider tab-slider"
+            name="tabs[<%= s.key %>]"
+            min="0" max="100" step="1"
+            value="<%= allocations.tabs[s.key] || 0 %>"
+            data-stream="<%= s.key %>"
+            oninput="onTabSlider(this)"
+            style="accent-color:<%= s.color %>"
+          >
+          <span class="alloc-pct" id="pct-tab-<%= s.key %>"><%= allocations.tabs[s.key] || 0 %>%</span>
+          <span class="alloc-dkk" id="dkk-tab-<%= s.key %>"></span>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="alloc-warning hidden" id="tab-warning">
+      ⚠ Must sum to 100% — currently <span id="tab-sum-display"></span>%
+    </div>
+  </div>
+
+  <!-- ══ Section 2: Role Distribution per Stream ══ -->
+  <div class="labour-card">
+    <div class="labour-card-header">Role Distribution per Stream</div>
+
+    <% [
+      { key: 'cafe',    label: '☕ Café',    color: '#1e3a5f' },
+      { key: 'events',  label: '🎪 Events',  color: '#0ea5e9' },
+      { key: 'b2b',     label: '🤝 B2B',     color: '#8b5cf6' },
+      { key: 'webshop', label: '🛒 Webshop', color: '#f59e0b' },
+    ].forEach(function(s) { %>
+      <div class="role-section">
+        <div class="role-section-header" onclick="toggleRoleSection('<%= s.key %>')">
+          <span><%= s.label %></span>
+          <div class="role-section-meta">
+            <span class="role-dkk-total" id="role-dkk-<%= s.key %>"></span>
+            <span class="badge" id="role-sum-badge-<%= s.key %>">100%</span>
+            <span class="role-chevron" id="role-chevron-<%= s.key %>">▶</span>
+          </div>
+        </div>
+
+        <div class="role-section-body" id="role-body-<%= s.key %>" style="display:none">
+          <% const roles = labourConfig.roles[s.key] || []; %>
+          <% roles.forEach(function(role) {
+            const safeId = role.replace(/[^a-z0-9]/gi, '_');
+            const pct = (allocations.roles[s.key] || {})[role] || 0;
+          %>
+            <div class="alloc-row">
+              <span class="alloc-label alloc-label-sm"><%= role %></span>
+              <input
+                type="range"
+                class="alloc-slider role-slider"
+                name="roles[<%= s.key %>][<%= role %>]"
+                min="0" max="100" step="1"
+                value="<%= pct %>"
+                data-stream="<%= s.key %>"
+                data-role="<%= role %>"
+                oninput="onRoleSlider(this)"
+                style="accent-color:<%= s.color %>"
+              >
+              <span class="alloc-pct" id="pct-role-<%= s.key %>-<%= safeId %>"><%= pct %>%</span>
+              <span class="alloc-dkk" id="dkk-role-<%= s.key %>-<%= safeId %>"></span>
+            </div>
+          <% }); %>
+
+          <div class="alloc-warning hidden" id="role-warning-<%= s.key %>">
+            ⚠ Must sum to 100% — currently <span id="role-sum-display-<%= s.key %>"></span>%
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+
+  <!-- ══ Save ══ -->
+  <div class="labour-actions">
+    <button type="button" class="btn-save" id="saveBtn" onclick="saveAllocations()">
+      Save Allocations
+    </button>
+    <span class="save-feedback hidden" id="saveFeedback"></span>
+  </div>
+
+</form>
+
+<script id="labour-init" type="application/json"><%- JSON.stringify({
+  labourTotal: labourTotal,
+  tabs: ['cafe', 'events', 'b2b', 'webshop']
+}) %></script>
+
+<script>
+(function() {
+  var cfg = JSON.parse(document.getElementById('labour-init').textContent);
+  var labourTotal = cfg.labourTotal || 0;
+  var tabKeys = cfg.tabs;
+
+  function fmt(n) {
+    return 'DKK\u00a0' + Number(n).toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function getTabPct(t) {
+    var sl = document.querySelector('input[name="tabs[' + t + ']"]');
+    return sl ? Number(sl.value) : 0;
+  }
+
+  function updateAll() {
+    var tabSum = 0;
+    tabKeys.forEach(function(t) {
+      var pct = getTabPct(t);
+      tabSum += pct;
+      var dkk = labourTotal * pct / 100;
+      // Update tab row
+      var pctEl = document.getElementById('pct-tab-' + t);
+      if (pctEl) pctEl.textContent = pct + '%';
+      var dkkEl = document.getElementById('dkk-tab-' + t);
+      if (dkkEl) dkkEl.textContent = fmt(dkk);
+      // Update proportional bar segment
+      var bar = document.getElementById('bar-' + t);
+      if (bar) bar.style.width = pct + '%';
+      // Cascade to role section
+      updateRoles(t, dkk);
+    });
+    // Tab sum badge
+    var badge = document.getElementById('tab-sum-badge');
+    var warn  = document.getElementById('tab-warning');
+    var disp  = document.getElementById('tab-sum-display');
+    var ok = Math.abs(tabSum - 100) < 1;
+    if (badge) { badge.textContent = tabSum + '%'; badge.className = 'badge ' + (ok ? 'badge-green' : 'badge-red'); }
+    if (warn)  warn.classList.toggle('hidden', ok);
+    if (disp)  disp.textContent = tabSum;
+  }
+
+  function updateRoles(tabKey, tabDkk) {
+    var sliders = document.querySelectorAll('input[data-stream="' + tabKey + '"].role-slider');
+    var sum = 0;
+    sliders.forEach(function(sl) {
+      var pct = Number(sl.value);
+      sum += pct;
+      var safe = sl.dataset.role.replace(/[^a-z0-9]/gi, '_');
+      var dkk = tabDkk * pct / 100;
+      var pEl = document.getElementById('pct-role-' + tabKey + '-' + safe);
+      var dEl = document.getElementById('dkk-role-' + tabKey + '-' + safe);
+      if (pEl) pEl.textContent = pct + '%';
+      if (dEl) dEl.textContent = fmt(dkk);
+    });
+    var badge = document.getElementById('role-sum-badge-' + tabKey);
+    var warn  = document.getElementById('role-warning-' + tabKey);
+    var disp  = document.getElementById('role-sum-display-' + tabKey);
+    var total = document.getElementById('role-dkk-' + tabKey);
+    var ok = Math.abs(sum - 100) < 1;
+    if (badge) { badge.textContent = sum + '%'; badge.className = 'badge ' + (ok ? 'badge-green' : 'badge-red'); }
+    if (warn)  warn.classList.toggle('hidden', ok);
+    if (disp)  disp.textContent = sum;
+    if (total) total.textContent = fmt(tabDkk);
+  }
+
+  window.onTabSlider = function(el) { updateAll(); };
+  window.onRoleSlider = function(el) {
+    var tabDkk = labourTotal * getTabPct(el.dataset.stream) / 100;
+    updateRoles(el.dataset.stream, tabDkk);
+  };
+
+  window.toggleRoleSection = function(key) {
+    var body    = document.getElementById('role-body-' + key);
+    var chevron = document.getElementById('role-chevron-' + key);
+    if (!body) return;
+    var open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    if (chevron) chevron.classList.toggle('open', !open);
+  };
+
+  window.saveAllocations = function() {
+    var inputs = document.getElementById('labourForm').querySelectorAll('input[name]');
+    var tabs = {}, roles = {};
+    inputs.forEach(function(inp) {
+      var m = inp.name.match(/^tabs\[(\w+)\]$/);
+      if (m) { tabs[m[1]] = Number(inp.value); return; }
+      var m2 = inp.name.match(/^roles\[(\w+)\]\[([^\]]+)\]$/);
+      if (m2) {
+        if (!roles[m2[1]]) roles[m2[1]] = {};
+        roles[m2[1]][m2[2]] = Number(inp.value);
+      }
+    });
+
+    var btn = document.getElementById('saveBtn');
+    var fb  = document.getElementById('saveFeedback');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch('/api/labour', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tabs: tabs, roles: roles })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Save Allocations';
+      if (d.ok) {
+        fb.textContent = '✓ Saved — dashboard will reflect changes on next load';
+        fb.className = 'save-feedback save-ok';
+        setTimeout(function() { fb.className = 'save-feedback hidden'; }, 5000);
+      } else {
+        fb.textContent = '✗ ' + (d.error || 'Save failed');
+        fb.className = 'save-feedback save-err';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Save Allocations';
+      fb.textContent = '✗ Network error';
+      fb.className = 'save-feedback save-err';
+    });
+  };
+
+  // Initialise on load
+  updateAll();
+})();
+</script>
+
+<%- include('footer') %>

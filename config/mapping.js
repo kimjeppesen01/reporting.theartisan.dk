@@ -131,7 +131,21 @@ module.exports = {
   },
 
   // Account codes to fully ignore (excluded from costs AND uncategorized)
-  ignore: ['1218'],
+  // 1499 is handled separately via the labour allocation system
+  ignore: ['1218', '1499'],
+
+  // Labour — account 1499 total is distributed manually via /labour editor
+  labour: {
+    account: '1499',
+    label: 'Labour',
+    icon: '👥',
+    roles: {
+      cafe:    ['Operations', 'Management', 'Production', 'Marketing', 'Cleaning'],
+      events:  ['Operations', 'Planning', 'Production'],
+      b2b:     ['Sales', 'Roasting', 'Testing', 'Packaging'],
+      webshop: ['Development', 'Packaging/Shipping'],
+    },
+  },
 
   // All available category labels (for the uncategorized dropdown)
   get allCategories() {

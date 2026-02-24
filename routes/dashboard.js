@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const billy = require('../services/billyService');
 const { categorizeBillLines, aggregateRevenue } = require('../utils/categorizer');
+const { loadAllocations, computeLabour } = require('../utils/labourService');
 const { getRangeForPeriod, getPreviousPeriodRange, getPeriodLabel } = require('../utils/dateUtils');
 const { formatCurrency, formatPercent } = require('../utils/formatters');
 const mapping = require('../config/mapping');
@@ -47,6 +48,20 @@ router.get('/', async (req, res) => {
     const prev = categorizeBillLines(prevBillLines, accountMap);
     prevGroups = prev.groups;
 
+    // Extract account 1499 (labour) totals — ignored by categorizer, handled here
+    const labourAccId = accountMap[mapping.labour.account]
+      ? accountMap[mapping.labour.account].id : null;
+    let labourTotal = 0, prevLabourTotal = 0;
+    if (labourAccId) {
+      billLines.forEach(l => { if (l.accountId === labourAccId) labourTotal += (l.amount || 0); });
+      prevBillLines.forEach(l => { if (l.accountId === labourAccId) prevLabourTotal += (l.amount || 0); });
+    }
+
+    // Compute labour cost group per tab using saved allocations
+    const labourAlloc = loadAllocations();
+    groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
+    prevGroups.labour = computeLabour(prevLabourTotal, labourAlloc, tab);
+
   } catch (err) {
     error = 'Could not connect to Billy API. Check your token in Settings.';
     console.error('Billy API error:', err.message);
@@ -56,6 +71,8 @@ router.get('/', async (req, res) => {
       groups[k] = { label: def.label, icon: def.icon || '📁', total: 0, categories: {} };
       prevGroups[k] = { total: 0, categories: {} };
     });
+    groups.labour     = { label: 'Labour', icon: '👥', total: 0, categories: {} };
+    prevGroups.labour = { label: 'Labour', icon: '👥', total: 0, categories: {} };
   }
 
   // Revenue: café from daybook (1111 credits), B2B from invoice totals
@@ -64,10 +81,10 @@ router.get('/', async (req, res) => {
 
   // Cost groups shown per tab
   const tabCostGroups = {
-    cafe:    ['cafe', 'coffee', 'admin', 'accounting', 'fixed', 'other'],
-    events:  [],
-    b2b:     ['admin', 'fixed'],
-    webshop: ['webshop'],
+    cafe:    ['cafe', 'coffee', 'admin', 'accounting', 'fixed', 'labour', 'other'],
+    events:  ['labour'],
+    b2b:     ['admin', 'fixed', 'labour'],
+    webshop: ['webshop', 'labour'],
   };
   const activeCostKeys = tabCostGroups[tab] || [];
 
