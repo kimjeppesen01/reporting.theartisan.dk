@@ -84,6 +84,7 @@ router.get('/', async (req, res) => {
   let invoices = [], prevInvoices = [];
   let groups = {}, uncategorized = [];
   let prevGroups = {};
+  let labourProjected = null;
 
   try {
     // Fetch all data in parallel
@@ -104,25 +105,30 @@ router.get('/', async (req, res) => {
     const prev = categorizeBillLines(prevBillLines, accountMap);
     prevGroups = prev.groups;
 
-    // Extract account 1499 (labour) totals — from bills AND daybook journal entries
-    // (Danish payroll is often posted as a daybook debit on 1499, not a vendor bill)
-    const labourAccId = accountMap[mapping.labour.account]
-      ? accountMap[mapping.labour.account].id : null;
+    // Extract all 14xx (labour/payroll) account totals — from bills AND daybook journal entries
+    // (Danish payroll is often posted as a daybook debit on 14xx accounts, not a vendor bill)
+    const labourPrefix = mapping.labour.accountPrefix;
+    const labourAccIds = new Set(
+      Object.entries(accountMap)
+        .filter(([code]) => code.startsWith(labourPrefix))
+        .map(([, acc]) => acc.id)
+    );
     let labourTotal = 0, prevLabourTotal = 0;
-    if (labourAccId) {
-      billLines.forEach(l => { if (l.accountId === labourAccId) labourTotal += (l.amount || 0); });
-      prevBillLines.forEach(l => { if (l.accountId === labourAccId) prevLabourTotal += (l.amount || 0); });
-      // Daybook journal entries: debit side on 1499 = salary expense
-      daybookLines.forEach(l => { if (l.accountId === labourAccId && l.side === 'debit') labourTotal += (l.amount || 0); });
-      prevDaybookLines.forEach(l => { if (l.accountId === labourAccId && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
-    }
+    billLines.forEach(l => { if (labourAccIds.has(l.accountId)) labourTotal += (l.amount || 0); });
+    prevBillLines.forEach(l => { if (labourAccIds.has(l.accountId)) prevLabourTotal += (l.amount || 0); });
+    // Daybook journal entries: debit side on 14xx = salary expense
+    daybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') labourTotal += (l.amount || 0); });
+    prevDaybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
 
     // Compute labour cost group per tab using saved allocations
     const labourAlloc = loadAllocations();
     groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
     prevGroups.labour = computeLabour(prevLabourTotal, labourAlloc, tab);
-    // Store full-period 1499 total for display in the Labour card
+    // Store full-period 14xx total for display in the Labour card
     groups.labour._rawTotal = labourTotal;
+
+    // Salary projection: for current month only, use last month's 14xx total as projected full-month value
+    labourProjected = (period === 'monthly' && offset === 0) ? prevLabourTotal : null;
 
   } catch (err) {
     error = 'Could not connect to Billy API. Check your token in Settings.';
@@ -239,6 +245,8 @@ router.get('/', async (req, res) => {
     // Cashflow Command Center
     cashflowTimeline,
     cashflowKpis,
+    // Labour projection
+    labourProjected,
     // Helpers
     formatCurrency, formatPercent,
   });

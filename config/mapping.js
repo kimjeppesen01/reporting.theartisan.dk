@@ -131,12 +131,12 @@ module.exports = {
   },
 
   // Account codes to fully ignore (excluded from costs AND uncategorized)
-  // 1499 is handled separately via the labour allocation system
-  ignore: ['1218', '1499'],
+  // 14xx accounts are excluded via labour.accountPrefix prefix matching below
+  ignore: ['1218'],
 
-  // Labour — account 1499 total is distributed manually via /labour editor
+  // Labour — all 14xx accounts summed, distributed manually via /labour editor
   labour: {
-    account: '1499',
+    accountPrefix: '14',   // All accounts starting with '14' are payroll/labour
     label: 'Labour',
     icon: '👥',
     roles: {

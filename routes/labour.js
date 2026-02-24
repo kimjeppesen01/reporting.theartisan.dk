@@ -20,17 +20,24 @@ router.get('/', async (req, res) => {
 
   try {
     const current = getRangeForPeriod(period);
-    const [accountMap, billLines] = await Promise.all([
+    const [accountMap, billLines, daybookLines] = await Promise.all([
       billy.getAccounts(),
       billy.getBillsWithLines(current.startDate, current.endDate),
+      billy.getDaybookLinesForRevenue(current.startDate, current.endDate),
     ]);
 
-    const labourAcc = accountMap[mapping.labour.account];
-    if (labourAcc) {
-      billLines.forEach(line => {
-        if (line.accountId === labourAcc.id) labourTotal += (line.amount || 0);
-      });
-    }
+    const prefix = mapping.labour.accountPrefix;
+    const labourAccIds = new Set(
+      Object.entries(accountMap)
+        .filter(([code]) => code.startsWith(prefix))
+        .map(([, acc]) => acc.id)
+    );
+    billLines.forEach(line => {
+      if (labourAccIds.has(line.accountId)) labourTotal += (line.amount || 0);
+    });
+    daybookLines.forEach(line => {
+      if (labourAccIds.has(line.accountId) && line.side === 'debit') labourTotal += (line.amount || 0);
+    });
   } catch (err) {
     error = 'Could not load salary data from Billy.';
     console.error('Labour route error:', err.message);

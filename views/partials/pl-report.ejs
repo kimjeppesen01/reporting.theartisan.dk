@@ -139,12 +139,18 @@
         <% if (groupKey === 'labour') { %>
           <% if (group._rawTotal > 0) { %>
             <div class="labour-dash-meta">
-              Account 1499 total this period: <strong><%= formatCurrency(group._rawTotal) %></strong>
+              All payroll accounts (14xx) this period: <strong><%= formatCurrency(group._rawTotal) %></strong>
               &middot; this tab's share: <strong><%= formatCurrency(group.total) %></strong>
             </div>
           <% } else { %>
             <div class="labour-dash-meta labour-dash-nodata">
-              No salary data for account 1499 this period.
+              No payroll data for 14xx accounts this period.
+            </div>
+          <% } %>
+          <% if (labourProjected > 0) { %>
+            <div class="labour-projection">
+              Projected full month: <strong><%= formatCurrency(labourProjected) %></strong>
+              <span class="labour-projection-note">(based on last month)</span>
             </div>
           <% } %>
           <% if (Object.keys(group.categories).length > 0) { %>

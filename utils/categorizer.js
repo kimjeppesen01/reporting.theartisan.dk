@@ -101,10 +101,18 @@ function buildAccountLookup(accountMap) {
 // Build the set of ignored account IDs
 function buildIgnoreSet(accountMap) {
   const s = new Set();
+  // Exact-code ignores
   mapping.ignore.forEach(code => {
     const acc = accountMap[code];
     if (acc) s.add(acc.id);
   });
+  // Prefix-range ignores: all 14xx accounts are labour, excluded from categorizer
+  const prefix = mapping.labour.accountPrefix;
+  if (prefix) {
+    Object.entries(accountMap).forEach(([code, acc]) => {
+      if (code.startsWith(prefix)) s.add(acc.id);
+    });
+  }
   return s;
 }
 
