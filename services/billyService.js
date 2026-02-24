@@ -111,6 +111,52 @@ async function getBankPayments(startDate, endDate) {
   return res.data.bankPayments || [];
 }
 
+// Fetch lines for a single daybook transaction
+async function _getDaybookLinesForId(txnId) {
+  const res = await billy.get('/daybookTransactionLines', {
+    params: { daybookTransactionId: txnId, pageSize: 1000 }
+  });
+  return res.data.daybookTransactionLines || [];
+}
+
+/**
+ * Fetch all daybook transaction lines for a date range.
+ * Used for revenue aggregation (credit-side lines on revenue accounts).
+ * Returns enriched lines: { id, txnId, accountId, side, amount, date }
+ */
+async function getDaybookLinesForRevenue(startDate, endDate) {
+  const res = await billy.get('/daybookTransactions', {
+    params: {
+      minEntryDate: startDate,
+      maxEntryDate: endDate,
+      pageSize: 1000
+    }
+  });
+  const txns = res.data.daybookTransactions || [];
+  if (txns.length === 0) return [];
+
+  const BATCH = 10;
+  const allLines = [];
+  for (let i = 0; i < txns.length; i += BATCH) {
+    const batch = txns.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(t => _getDaybookLinesForId(t.id)));
+    results.forEach((lines, idx) => {
+      const date = batch[idx].entryDate || '';
+      lines.forEach(line => {
+        allLines.push({
+          id: line.id,
+          txnId: line.daybookTransactionId,
+          accountId: line.accountId,
+          side: line.side,
+          amount: line.amount || 0,
+          date,
+        });
+      });
+    });
+  }
+  return allLines;
+}
+
 module.exports = {
   getOrganisation,
   getAccounts,
@@ -119,4 +165,5 @@ module.exports = {
   getBills,
   getBillsWithLines,
   getBankPayments,
+  getDaybookLinesForRevenue,
 };

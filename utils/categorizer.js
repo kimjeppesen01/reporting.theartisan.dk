@@ -238,10 +238,11 @@ function findGroupForCategory(categoryName) {
 }
 
 /**
- * Aggregate invoice lines by revenue account code.
+ * Aggregate daybook transaction lines by revenue account code.
+ * Uses credit-side lines on known revenue accounts.
  * Returns { cafe, events, webshop, b2b_dk, b2b_eu, total }
  */
-function aggregateRevenue(invoices, accountMap) {
+function aggregateRevenue(daybookLines, accountMap) {
   const rev = mapping.revenue;
   const result = { cafe: 0, events: 0, webshop: 0, b2b_dk: 0, b2b_eu: 0, total: 0 };
 
@@ -252,18 +253,13 @@ function aggregateRevenue(invoices, accountMap) {
     if (acc) streamMap[acc.id] = key;
   });
 
-  invoices.forEach(inv => {
-    const amount = inv.amount || 0;
-    // Try to match by contactAccountNo (account code on the invoice)
-    const code = String(inv.contactAccountNo || inv.accountNo || '');
-    const stream = Object.entries(rev).find(([, c]) => c === code);
-    if (stream) {
-      result[stream[0]] = (result[stream[0]] || 0) + amount;
-      result.total += amount;
-    } else {
-      // Fallback: add to total only
-      result.total += amount;
-    }
+  daybookLines.forEach(line => {
+    if (line.side !== 'credit') return;
+    const stream = streamMap[line.accountId];
+    if (!stream) return;
+    const amount = line.amount || 0;
+    result[stream] = (result[stream] || 0) + amount;
+    result.total += amount;
   });
 
   return result;
