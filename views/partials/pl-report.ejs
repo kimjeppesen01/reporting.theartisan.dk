@@ -125,6 +125,9 @@
         <div class="cost-group-left">
           <span class="cost-group-icon"><%= group.icon %></span>
           <span class="cost-group-label"><%= group.label %></span>
+          <% if (groupKey === 'fixed' && group._rawTotal > 0 && group._tabPct < 1) { %>
+            <span class="alloc-badge"><%= Math.round((group._tabPct || 0) * 100) %>% of total</span>
+          <% } %>
         </div>
         <div class="cost-group-right">
           <div class="cost-group-bar-wrap">
@@ -175,37 +178,151 @@
             <% }); %>
           <% } %>
           <div class="labour-dash-link">
-            <a href="/labour?period=<%= period %>">Adjust allocations →</a>
+            <a href="/labour">Adjust allocations →</a>
           </div>
-        <% } else { %>
-        <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
-          <%
-            const catPct = group.total > 0 ? (catData.total / group.total * 100) : 0;
-          %>
-          <div class="cost-category">
-            <div class="cost-category-header" onclick="toggleCategory('<%= groupKey %>-<%= catName.replace(/\s/g,'_') %>')">
-              <span class="cost-category-name"><%= catName %></span>
-              <div class="cost-category-right">
-                <div class="mini-bar-wrap">
-                  <div class="mini-bar" style="width:<%= Math.min(catPct, 100) %>%"></div>
+
+        <% } else if (groupKey === 'fixed') { %>
+          <% if (group._rawTotal > 0) { %>
+            <div class="labour-dash-meta">
+              All fixed accounts: <strong><%= formatCurrency(group._rawTotal) %></strong>
+              &middot; This tab (<%= Math.round((group._tabPct || 0) * 100) %>%): <strong><%= formatCurrency(group.total) %></strong>
+            </div>
+          <% } %>
+          <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
+            <%
+              const catPct     = group.total > 0 ? (catData.total / group.total * 100) : 0;
+              const distKey    = 'fixed:' + catName;
+              const distRule   = distributions && distributions[distKey];
+              const distMonths = distRule ? distRule.months : 1;
+              const hasCarry   = catData._hasCarryOver;
+              const safeId     = catName.replace(/[^a-z0-9]/gi, '_');
+            %>
+            <div class="cost-category">
+              <div class="cost-category-header" onclick="toggleCategory('fixed-<%= safeId %>')">
+                <span class="cost-category-name">
+                  <%= catName %>
+                  <% if (distMonths > 1) { %><span class="dist-badge">÷<%= distMonths %>mo</span><% } %>
+                  <% if (hasCarry) { %><span class="dist-carry-badge" title="Includes carry-over from previous months">⟲</span><% } %>
+                </span>
+                <div class="cost-category-right">
+                  <div class="mini-bar-wrap">
+                    <div class="mini-bar<% if (hasCarry) { %> mini-bar-distributed<% } %>" style="width:<%= Math.min(catPct, 100) %>%"></div>
+                  </div>
+                  <span class="cost-category-total"><%= formatCurrency(catData.total) %></span>
+                  <span class="cost-category-pct"><%= formatPercent(catPct) %></span>
+                  <button class="cat-settings-btn" onclick="event.stopPropagation();toggleCatSettings('fixed','<%= safeId %>')" title="Distribution settings">⚙</button>
                 </div>
-                <span class="cost-category-total"><%= formatCurrency(catData.total) %></span>
-                <span class="cost-category-pct"><%= formatPercent(catPct) %></span>
+              </div>
+              <div class="cat-settings-panel hidden" id="cat-settings-fixed-<%= safeId %>">
+                <div class="cat-settings-row">
+                  <label>Distribute over</label>
+                  <input type="number" class="dist-months-input" min="1" max="24" value="<%= distMonths %>"
+                    id="dist-months-fixed-<%= safeId %>">
+                  <span>months</span>
+                  <button class="dist-save-btn" onclick="saveDistribution('fixed','<%= catName %>','<%= safeId %>',this)">Save</button>
+                  <span class="dist-help">Set to 1 to show full cost each month.</span>
+                </div>
+              </div>
+              <div class="cost-lines" id="lines-fixed-<%= safeId %>" style="display:none">
+                <% catData.lines.forEach(line => { %>
+                  <div class="cost-line<% if (line._distributed) { %> cost-line-distributed<% } %>">
+                    <span class="cost-line-supplier"><%= line.supplierName %><% if (line._distributed) { %> <span class="dist-from-badge">carry-over</span><% } %></span>
+                    <span class="cost-line-amount"><%= formatCurrency(line.amount) %></span>
+                  </div>
+                <% }); %>
               </div>
             </div>
-            <div class="cost-lines" id="lines-<%= groupKey %>-<%= catName.replace(/\s/g,'_') %>" style="display:none">
-              <% catData.lines.forEach(line => { %>
-                <div class="cost-line">
-                  <span class="cost-line-supplier"><%= line.supplierName %></span>
-                  <span class="cost-line-amount"><%= formatCurrency(line.amount) %></span>
-                </div>
-              <% }); %>
-            </div>
+          <% }); %>
+          <div class="labour-dash-link">
+            <a href="/fixed-costs">Adjust allocations →</a>
           </div>
-        <% }); %>
+
+        <% } else { %>
+          <% Object.entries(group.categories).forEach(([catName, catData]) => { %>
+            <%
+              const catPct     = group.total > 0 ? (catData.total / group.total * 100) : 0;
+              const distKey    = groupKey + ':' + catName;
+              const distRule   = distributions && distributions[distKey];
+              const distMonths = distRule ? distRule.months : 1;
+              const hasCarry   = catData._hasCarryOver;
+              const safeId     = catName.replace(/[^a-z0-9]/gi, '_');
+            %>
+            <div class="cost-category">
+              <div class="cost-category-header" onclick="toggleCategory('<%= groupKey %>-<%= safeId %>')">
+                <span class="cost-category-name">
+                  <%= catName %>
+                  <% if (distMonths > 1) { %><span class="dist-badge">÷<%= distMonths %>mo</span><% } %>
+                  <% if (hasCarry) { %><span class="dist-carry-badge" title="Includes carry-over from previous months">⟲</span><% } %>
+                </span>
+                <div class="cost-category-right">
+                  <div class="mini-bar-wrap">
+                    <div class="mini-bar<% if (hasCarry) { %> mini-bar-distributed<% } %>" style="width:<%= Math.min(catPct, 100) %>%"></div>
+                  </div>
+                  <span class="cost-category-total"><%= formatCurrency(catData.total) %></span>
+                  <span class="cost-category-pct"><%= formatPercent(catPct) %></span>
+                  <button class="cat-settings-btn" onclick="event.stopPropagation();toggleCatSettings('<%= groupKey %>','<%= safeId %>')" title="Distribution settings">⚙</button>
+                </div>
+              </div>
+              <div class="cat-settings-panel hidden" id="cat-settings-<%= groupKey %>-<%= safeId %>">
+                <div class="cat-settings-row">
+                  <label>Distribute over</label>
+                  <input type="number" class="dist-months-input" min="1" max="24" value="<%= distMonths %>"
+                    id="dist-months-<%= groupKey %>-<%= safeId %>">
+                  <span>months</span>
+                  <button class="dist-save-btn" onclick="saveDistribution('<%= groupKey %>','<%= catName %>','<%= safeId %>',this)">Save</button>
+                  <span class="dist-help">Set to 1 to show full cost each month.</span>
+                </div>
+              </div>
+              <div class="cost-lines" id="lines-<%= groupKey %>-<%= safeId %>" style="display:none">
+                <% catData.lines.forEach(line => { %>
+                  <div class="cost-line<% if (line._distributed) { %> cost-line-distributed<% } %>">
+                    <span class="cost-line-supplier"><%= line.supplierName %><% if (line._distributed) { %> <span class="dist-from-badge">carry-over</span><% } %></span>
+                    <span class="cost-line-amount"><%= formatCurrency(line.amount) %></span>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
         <% } %>
       </div>
     </div>
   <% }); %>
 </div>
 <% } %>
+
+<script>
+function toggleCatSettings(groupKey, safeId) {
+  var panel = document.getElementById('cat-settings-' + groupKey + '-' + safeId);
+  if (panel) panel.classList.toggle('hidden');
+}
+
+function saveDistribution(groupKey, catName, safeId, btn) {
+  var inp = document.getElementById('dist-months-' + groupKey + '-' + safeId);
+  if (!inp) return;
+  var months = Number(inp.value) || 1;
+  var origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch('/api/distribution', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ groupKey: groupKey, category: catName, months: months }),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    if (d.ok) {
+      btn.textContent = '✓ Saved';
+      setTimeout(function() { location.reload(); }, 800);
+    } else {
+      btn.textContent = '✗';
+      setTimeout(function() { btn.textContent = origText; }, 2000);
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    btn.textContent = '✗';
+    setTimeout(function() { btn.textContent = origText; }, 2000);
+  });
+}
+</script>

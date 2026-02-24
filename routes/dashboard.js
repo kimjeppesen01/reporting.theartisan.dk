@@ -1,7 +1,9 @@
 const router = require('express').Router();
-const billy = require('../services/billyService');
+const billy  = require('../services/billyService');
 const { categorizeBillLines, aggregateRevenue } = require('../utils/categorizer');
-const { loadAllocations, computeLabour } = require('../utils/labourService');
+const { loadAllocations, computeLabour }        = require('../utils/labourService');
+const { loadFixedAlloc, computeFixedCosts }     = require('../utils/fixedCostsService');
+const { loadDistributions, applyDistributions, monthKeyOffset } = require('../utils/distributionService');
 const { getRangeForPeriod, getPreviousPeriodRange, getPeriodLabel } = require('../utils/dateUtils');
 const { formatCurrency, formatPercent } = require('../utils/formatters');
 const mapping = require('../config/mapping');
@@ -35,7 +37,7 @@ function bucketCashflow(period, daybookLines, billLines, invoices, accountMap) {
     getBucket = s => new Date(s).getMonth();
   }
 
-  const inflow = Array(n).fill(0);
+  const inflow  = Array(n).fill(0);
   const outflow = Array(n).fill(0);
 
   daybookLines.forEach(l => {
@@ -67,17 +69,20 @@ router.get('/', async (req, res) => {
   const tab = ['cafe', 'events', 'b2b', 'webshop'].includes(req.query.tab)
     ? req.query.tab
     : 'cafe';
-  // offset: 0 = current period, -1 = prev, -2 = two ago, etc. Block future periods.
   const offset = Math.min(0, parseInt(req.query.offset) || 0);
 
   if (!process.env.BILLY_API_TOKEN) {
     return res.redirect('/settings?error=no_token');
   }
 
-  const current = getRangeForPeriod(period, offset);
+  const current  = getRangeForPeriod(period, offset);
   const previous = getPreviousPeriodRange(period, offset);
-  let error = null;
 
+  // Derive YYYY-MM keys for month-specific settings
+  const currentMonthKey  = current.startDate.slice(0, 7);
+  const previousMonthKey = previous.startDate.slice(0, 7);
+
+  let error = null;
   let accountMap = {};
   let billLines = [], prevBillLines = [];
   let daybookLines = [], prevDaybookLines = [];
@@ -86,9 +91,13 @@ router.get('/', async (req, res) => {
   let prevGroups = {};
   let labourProjected = null;
 
+  // Load distribution rules up front to know if we need historical data
+  const distributions = loadDistributions();
+  const maxDist = Object.values(distributions).reduce((m, d) => Math.max(m, d.months || 1), 1);
+
   try {
-    // Fetch all data in parallel
-    [accountMap, billLines, prevBillLines, daybookLines, prevDaybookLines, invoices, prevInvoices] = await Promise.all([
+    // Core fetches: current + previous period
+    const corePromises = [
       billy.getAccounts(),
       billy.getBillsWithLines(current.startDate, current.endDate),
       billy.getBillsWithLines(previous.startDate, previous.endDate),
@@ -96,17 +105,50 @@ router.get('/', async (req, res) => {
       billy.getDaybookLinesForRevenue(previous.startDate, previous.endDate),
       billy.getInvoices(current.startDate, current.endDate),
       billy.getInvoices(previous.startDate, previous.endDate),
+    ];
+
+    // Historical fetches for distribution (months 2..maxDist ago, relative to current)
+    // Only needed for monthly period — distribution is month-centric
+    const histKeys = [];
+    const histPromises = [];
+    if (period === 'monthly' && maxDist > 1) {
+      for (let i = 2; i <= maxDist; i++) {
+        const hKey = monthKeyOffset(currentMonthKey, -(i - 1));
+        // Previous month (i=2) is already fetched in prevBillLines — skip
+        if (hKey === previousMonthKey) continue;
+        const hRange = getRangeForPeriod('monthly', offset - i + 1);
+        histKeys.push(hKey);
+        histPromises.push(billy.getBillsWithLines(hRange.startDate, hRange.endDate));
+      }
+    }
+
+    const [results, histResults] = await Promise.all([
+      Promise.all(corePromises),
+      Promise.all(histPromises),
     ]);
 
+    [accountMap, billLines, prevBillLines, daybookLines, prevDaybookLines, invoices, prevInvoices] = results;
+
     const curr = categorizeBillLines(billLines, accountMap);
-    groups = curr.groups;
+    groups      = curr.groups;
     uncategorized = curr.uncategorized;
 
     const prev = categorizeBillLines(prevBillLines, accountMap);
-    prevGroups = prev.groups;
+    prevGroups  = prev.groups;
 
-    // Extract all 14xx (labour/payroll) account totals — from bills AND daybook journal entries
-    // (Danish payroll is often posted as a daybook debit on 14xx accounts, not a vendor bill)
+    // Build historical groups map for distribution: { 'YYYY-MM': groups }
+    const historicalGroups = { [previousMonthKey]: prevGroups };
+    histKeys.forEach((hKey, idx) => {
+      const hGrouped = categorizeBillLines(histResults[idx], accountMap);
+      historicalGroups[hKey] = hGrouped.groups;
+    });
+
+    // Apply multi-month distribution to current period groups (monthly only)
+    if (period === 'monthly') {
+      applyDistributions(groups, distributions, historicalGroups, currentMonthKey);
+    }
+
+    // ── Labour ──
     const labourPrefix = mapping.labour.accountPrefix;
     const labourAccIds = new Set(
       Object.entries(accountMap)
@@ -116,49 +158,52 @@ router.get('/', async (req, res) => {
     let labourTotal = 0, prevLabourTotal = 0;
     billLines.forEach(l => { if (labourAccIds.has(l.accountId)) labourTotal += (l.amount || 0); });
     prevBillLines.forEach(l => { if (labourAccIds.has(l.accountId)) prevLabourTotal += (l.amount || 0); });
-    // Daybook journal entries: debit side on 14xx = salary expense
     daybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') labourTotal += (l.amount || 0); });
     prevDaybookLines.forEach(l => { if (labourAccIds.has(l.accountId) && l.side === 'debit') prevLabourTotal += (l.amount || 0); });
 
-    // Compute labour cost group per tab using saved allocations
-    const labourAlloc = loadAllocations();
-    groups.labour     = computeLabour(labourTotal,     labourAlloc, tab);
-    prevGroups.labour = computeLabour(prevLabourTotal, labourAlloc, tab);
-    // Store gross/net/deduction for display in the Labour card
+    const labourAlloc     = loadAllocations(currentMonthKey);
+    const prevLabourAlloc = loadAllocations(previousMonthKey);
+    groups.labour         = computeLabour(labourTotal,     labourAlloc,     tab);
+    prevGroups.labour     = computeLabour(prevLabourTotal, prevLabourAlloc, tab);
     groups.labour._rawTotal  = labourTotal;
     groups.labour._deduction = labourAlloc.deduction || 0;
     groups.labour._netTotal  = Math.max(0, labourTotal - (labourAlloc.deduction || 0));
 
-    // Salary projection: for current month only, use last month's 14xx total as projected full-month value
     labourProjected = (period === 'monthly' && offset === 0) ? prevLabourTotal : null;
+
+    // ── Fixed Costs allocation ──
+    const rawFixed          = groups.fixed      || { label: 'Fixed Costs', icon: '🏠', total: 0, categories: {} };
+    const rawPrevFixed      = prevGroups.fixed  || { label: 'Fixed Costs', icon: '🏠', total: 0, categories: {} };
+    const fixedAlloc        = loadFixedAlloc(currentMonthKey);
+    const prevFixedAlloc    = loadFixedAlloc(previousMonthKey);
+    groups.fixed            = computeFixedCosts(rawFixed,     fixedAlloc,     tab);
+    prevGroups.fixed        = computeFixedCosts(rawPrevFixed, prevFixedAlloc, tab);
 
   } catch (err) {
     error = 'Could not connect to Billy API. Check your token in Settings.';
     console.error('Billy API error:', err.message);
-    // Initialise empty groups so view doesn't crash
     ['cafe','coffee','admin','accounting','fixed','webshop','other'].forEach(k => {
       const def = mapping.costs[k];
-      groups[k] = { label: def.label, icon: def.icon || '📁', total: 0, categories: {} };
+      groups[k]     = { label: def.label, icon: def.icon || '📁', total: 0, categories: {} };
       prevGroups[k] = { total: 0, categories: {} };
     });
     groups.labour     = { label: 'Labour', icon: '👥', total: 0, categories: {}, _rawTotal: 0 };
     prevGroups.labour = { label: 'Labour', icon: '👥', total: 0, categories: {}, _rawTotal: 0 };
   }
 
-  // Revenue: café from daybook (1111 credits), B2B from invoice totals
-  const revenue = aggregateRevenue(daybookLines, invoices, accountMap);
+  // Revenue
+  const revenue     = aggregateRevenue(daybookLines,     invoices,     accountMap);
   const prevRevenue = aggregateRevenue(prevDaybookLines, prevInvoices, accountMap);
 
-  // Cost groups shown per tab
+  // Cost groups per tab (fixed is now allocated, so include for all tabs)
   const tabCostGroups = {
     cafe:    ['cafe', 'coffee', 'admin', 'accounting', 'fixed', 'labour', 'other'],
-    events:  ['labour'],
+    events:  ['fixed', 'labour'],
     b2b:     ['admin', 'fixed', 'labour'],
-    webshop: ['webshop', 'labour'],
+    webshop: ['webshop', 'fixed', 'labour'],
   };
   const activeCostKeys = tabCostGroups[tab] || [];
 
-  // Tab-specific revenue
   const tabRevenue = {
     cafe:    revenue.cafe,
     events:  revenue.events,
@@ -172,41 +217,35 @@ router.get('/', async (req, res) => {
     webshop: prevRevenue.webshop,
   };
 
-  const activeRevenue = tabRevenue[tab] || 0;
+  const activeRevenue     = tabRevenue[tab]     || 0;
   const prevActiveRevenue = prevTabRevenue[tab] || 0;
 
-  // Tab-specific costs (only the groups that belong to this tab)
-  const totalCosts = activeCostKeys.reduce((s, k) => s + (groups[k] ? groups[k].total : 0), 0);
+  const totalCosts     = activeCostKeys.reduce((s, k) => s + (groups[k]     ? groups[k].total     : 0), 0);
   const prevTotalCosts = activeCostKeys.reduce((s, k) => s + (prevGroups[k] ? prevGroups[k].total : 0), 0);
 
-  // Gross profit
-  const grossProfit = activeRevenue - totalCosts;
+  const grossProfit     = activeRevenue - totalCosts;
   const prevGrossProfit = prevActiveRevenue - prevTotalCosts;
-  const profitMargin = activeRevenue > 0 ? (grossProfit / activeRevenue) * 100 : 0;
+  const profitMargin    = activeRevenue > 0 ? (grossProfit / activeRevenue) * 100 : 0;
 
-  // Trend helper
   function trend(curr, prev) {
     if (curr > prev * 1.005) return 'up';
     if (curr < prev * 0.995) return 'down';
     return 'flat';
   }
 
-  // Cost group delta % vs previous period (for health borders)
   function costDeltaPct(groupKey) {
-    const curr = groups[groupKey] ? groups[groupKey].total : 0;
-    const prev = prevGroups[groupKey] ? prevGroups[groupKey].total : 0;
-    if (prev === 0) return 0;
-    return ((curr - prev) / prev) * 100;
+    const c = groups[groupKey]     ? groups[groupKey].total     : 0;
+    const p = prevGroups[groupKey] ? prevGroups[groupKey].total : 0;
+    if (p === 0) return 0;
+    return ((c - p) / p) * 100;
   }
 
-  // Waterfall data — only the cost groups for this tab
   const activeGroups = activeCostKeys.map(k => groups[k]).filter(g => g && g.total > 0);
   const waterfallData = {
     labels: ['Revenue', ...activeGroups.map(g => g.label), 'Gross Profit'],
     values: [activeRevenue, ...activeGroups.map(g => -g.total), grossProfit],
   };
 
-  // Cashflow timeline — bucketed by period granularity (business-wide, not tab-specific)
   const cashflowTimeline = bucketCashflow(period, daybookLines, billLines, invoices, accountMap);
   const cfInTotal  = cashflowTimeline.inflow.reduce((a, b) => a + b, 0);
   const cfOutTotal = cashflowTimeline.outflow.reduce((a, b) => a + b, 0);
@@ -227,29 +266,22 @@ router.get('/', async (req, res) => {
     offset,
     dateRange: `${current.startDate} — ${current.endDate}`,
     error,
-    // Revenue
     revenue, prevRevenue, activeRevenue, prevActiveRevenue,
     tabRevenue,
     revenueTrend: trend(activeRevenue, prevActiveRevenue),
-    // Costs
     groups, prevGroups, totalCosts, prevTotalCosts,
     activeCostKeys,
     costTrend: trend(totalCosts, prevTotalCosts),
     costDeltaPct,
-    // P&L
     grossProfit, prevGrossProfit, profitMargin,
     profitTrend: trend(grossProfit, prevGrossProfit),
-    // Uncategorized
     uncategorized,
     allCategories: mapping.allCategories,
-    // Waterfall
+    distributions,
     waterfallData,
-    // Cashflow Command Center
     cashflowTimeline,
     cashflowKpis,
-    // Labour projection
     labourProjected,
-    // Helpers
     formatCurrency, formatPercent,
   });
 });

@@ -11,7 +11,7 @@
   <div>
     <h1 class="labour-title">👥 Labour Allocation</h1>
     <div class="labour-subtitle">
-      All 14xx accounts this period:
+      All 14xx accounts this month:
       <strong class="labour-total-dkk"><%= formatCurrency(labourGross) %></strong>
       <% if (allocations.deduction > 0) { %>
         &nbsp;·&nbsp; Deduction: <strong style="color:#ef4444"><%= formatCurrency(allocations.deduction) %></strong>
@@ -19,10 +19,10 @@
       <% } %>
     </div>
   </div>
-  <div class="period-tabs">
-    <a href="/labour?period=weekly"  class="tab <%= period === 'weekly'  ? 'active' : '' %>">Weekly</a>
-    <a href="/labour?period=monthly" class="tab <%= period === 'monthly' ? 'active' : '' %>">Monthly</a>
-    <a href="/labour?period=yearly"  class="tab <%= period === 'yearly'  ? 'active' : '' %>">Yearly</a>
+  <div class="month-nav">
+    <% monthNav.forEach(function(m) { %>
+      <a href="/labour?month=<%= m.key %>" class="tab <%= m.active ? 'active' : '' %>"><%= m.label %></a>
+    <% }); %>
   </div>
 </div>
 
@@ -164,6 +164,7 @@
 <script id="labour-init" type="application/json"><%- JSON.stringify({
   labourGross: labourGross,
   labourTotal: labourTotal,
+  monthKey:    monthKey,
   tabs: ['cafe', 'events', 'b2b', 'webshop']
 }) %></script>
 
@@ -171,7 +172,8 @@
 (function() {
   var cfg = JSON.parse(document.getElementById('labour-init').textContent);
   var labourGross = cfg.labourGross || 0;
-  var tabKeys = cfg.tabs;
+  var monthKey    = cfg.monthKey;
+  var tabKeys     = cfg.tabs;
 
   function getDeduction() {
     var el = document.getElementById('deductionInput');
@@ -201,18 +203,14 @@
       var pct = getTabPct(t);
       tabSum += pct;
       var dkk = net * pct / 100;
-      // Update tab row
       var pctEl = document.getElementById('pct-tab-' + t);
       if (pctEl) pctEl.textContent = pct + '%';
       var dkkEl = document.getElementById('dkk-tab-' + t);
       if (dkkEl) dkkEl.textContent = fmt(dkk);
-      // Update proportional bar segment
       var bar = document.getElementById('bar-' + t);
       if (bar) bar.style.width = pct + '%';
-      // Cascade to role section
       updateRoles(t, dkk);
     });
-    // Tab sum badge
     var badge = document.getElementById('tab-sum-badge');
     var warn  = document.getElementById('tab-warning');
     var disp  = document.getElementById('tab-sum-display');
@@ -226,12 +224,12 @@
     var sliders = document.querySelectorAll('input[data-stream="' + tabKey + '"].role-slider');
     var sum = 0;
     sliders.forEach(function(sl) {
-      var pct = Number(sl.value);
+      var pct  = Number(sl.value);
       sum += pct;
       var safe = sl.dataset.role.replace(/[^a-z0-9]/gi, '_');
-      var dkk = tabDkk * pct / 100;
-      var pEl = document.getElementById('pct-role-' + tabKey + '-' + safe);
-      var dEl = document.getElementById('dkk-role-' + tabKey + '-' + safe);
+      var dkk  = tabDkk * pct / 100;
+      var pEl  = document.getElementById('pct-role-' + tabKey + '-' + safe);
+      var dEl  = document.getElementById('dkk-role-' + tabKey + '-' + safe);
       if (pEl) pEl.textContent = pct + '%';
       if (dEl) dEl.textContent = fmt(dkk);
     });
@@ -247,9 +245,9 @@
   }
 
   window.onDeductionChange = function() { updateAll(); };
-  window.onTabSlider = function(el) { updateAll(); };
+  window.onTabSlider = function() { updateAll(); };
   window.onRoleSlider = function(el) {
-    var net = getNetTotal();
+    var net    = getNetTotal();
     var tabDkk = net * getTabPct(el.dataset.stream) / 100;
     updateRoles(el.dataset.stream, tabDkk);
   };
@@ -284,14 +282,14 @@
     fetch('/api/labour', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tabs: tabs, roles: roles, deduction: getDeduction() })
+      body: JSON.stringify({ tabs: tabs, roles: roles, deduction: getDeduction(), month: monthKey })
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       btn.disabled = false;
       btn.textContent = 'Save Allocations';
       if (d.ok) {
-        fb.textContent = '✓ Saved — dashboard will reflect changes on next load';
+        fb.textContent = '✓ Saved';
         fb.className = 'save-feedback save-ok';
         setTimeout(function() { fb.className = 'save-feedback hidden'; }, 5000);
       } else {
@@ -307,7 +305,6 @@
     });
   };
 
-  // Initialise on load
   updateAll();
 })();
 </script>

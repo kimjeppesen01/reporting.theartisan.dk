@@ -1,0 +1,189 @@
+<%- include('layout', { pageTitle: 'Fixed Costs Allocation' }) %>
+
+<% if (error) { %>
+  <div class="error-banner"><%= error %></div>
+<% } %>
+<% if (saved) { %>
+  <div class="success-banner">✓ Allocations saved.</div>
+<% } %>
+
+<div class="labour-header">
+  <div>
+    <h1 class="labour-title">🏠 Fixed Costs Allocation</h1>
+    <div class="labour-subtitle">
+      All fixed accounts this month:
+      <strong class="labour-total-dkk"><%= formatCurrency(fixedTotal) %></strong>
+    </div>
+  </div>
+  <div class="month-nav">
+    <% monthNav.forEach(function(m) { %>
+      <a href="/fixed-costs?month=<%= m.key %>" class="tab <%= m.active ? 'active' : '' %>"><%= m.label %></a>
+    <% }); %>
+  </div>
+</div>
+
+<form id="fixedForm">
+
+  <!-- ══ Stream Allocation ══ -->
+  <div class="labour-card">
+    <div class="labour-card-header">
+      <span>Business Stream Allocation</span>
+      <span id="tab-sum-badge" class="badge badge-green">100%</span>
+    </div>
+
+    <div class="stream-bar-wrap">
+      <div class="stream-bar-segment" id="bar-cafe"    style="background:#1e3a5f"></div>
+      <div class="stream-bar-segment" id="bar-events"  style="background:#0ea5e9"></div>
+      <div class="stream-bar-segment" id="bar-b2b"     style="background:#8b5cf6"></div>
+      <div class="stream-bar-segment" id="bar-webshop" style="background:#f59e0b"></div>
+    </div>
+    <div class="stream-bar-legend">
+      <span><span class="legend-dot" style="background:#1e3a5f"></span>Café</span>
+      <span><span class="legend-dot" style="background:#0ea5e9"></span>Events</span>
+      <span><span class="legend-dot" style="background:#8b5cf6"></span>B2B</span>
+      <span><span class="legend-dot" style="background:#f59e0b"></span>Webshop</span>
+    </div>
+
+    <div class="alloc-rows">
+      <% [
+        { key: 'cafe',    label: '☕ Café',    color: '#1e3a5f' },
+        { key: 'events',  label: '🎪 Events',  color: '#0ea5e9' },
+        { key: 'b2b',     label: '🤝 B2B',     color: '#8b5cf6' },
+        { key: 'webshop', label: '🛒 Webshop', color: '#f59e0b' },
+      ].forEach(function(s) { %>
+        <div class="alloc-row">
+          <span class="alloc-label"><%= s.label %></span>
+          <input
+            type="range"
+            class="alloc-slider tab-slider"
+            name="tabs[<%= s.key %>]"
+            min="0" max="100" step="1"
+            value="<%= alloc.tabs[s.key] || 0 %>"
+            data-stream="<%= s.key %>"
+            oninput="onTabSlider()"
+            style="accent-color:<%= s.color %>"
+          >
+          <span class="alloc-pct" id="pct-tab-<%= s.key %>"><%= alloc.tabs[s.key] || 0 %>%</span>
+          <span class="alloc-dkk" id="dkk-tab-<%= s.key %>"></span>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="alloc-warning hidden" id="tab-warning">
+      ⚠ Must sum to 100% — currently <span id="tab-sum-display"></span>%
+    </div>
+  </div>
+
+  <!-- ══ Cost Categories Breakdown ══ -->
+  <% if (Object.keys(fixedCategories).length > 0) { %>
+  <div class="labour-card">
+    <div class="labour-card-header">Included Cost Categories (this month)</div>
+    <% Object.entries(fixedCategories).forEach(function([name, data]) { %>
+      <div class="alloc-row" style="cursor:default">
+        <span class="alloc-label alloc-label-sm"><%= name %></span>
+        <span style="flex:1"></span>
+        <span class="alloc-dkk"><%= formatCurrency(data.total) %></span>
+      </div>
+    <% }); %>
+  </div>
+  <% } %>
+
+  <!-- ══ Save ══ -->
+  <div class="labour-actions">
+    <button type="button" class="btn-save" id="saveBtn" onclick="saveFixedAlloc()">
+      Save Allocations
+    </button>
+    <span class="save-feedback hidden" id="saveFeedback"></span>
+  </div>
+
+</form>
+
+<script id="fixed-init" type="application/json"><%- JSON.stringify({
+  fixedTotal: fixedTotal,
+  monthKey:   monthKey,
+  tabs: ['cafe', 'events', 'b2b', 'webshop']
+}) %></script>
+
+<script>
+(function() {
+  var cfg        = JSON.parse(document.getElementById('fixed-init').textContent);
+  var fixedTotal = cfg.fixedTotal || 0;
+  var monthKey   = cfg.monthKey;
+  var tabKeys    = cfg.tabs;
+
+  function fmt(n) {
+    return 'DKK\u00a0' + Number(n).toLocaleString('da-DK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function getTabPct(t) {
+    var sl = document.querySelector('input[name="tabs[' + t + ']"]');
+    return sl ? Number(sl.value) : 0;
+  }
+
+  function updateAll() {
+    var tabSum = 0;
+    tabKeys.forEach(function(t) {
+      var pct = getTabPct(t);
+      tabSum += pct;
+      var pctEl = document.getElementById('pct-tab-' + t);
+      if (pctEl) pctEl.textContent = pct + '%';
+      var dkkEl = document.getElementById('dkk-tab-' + t);
+      if (dkkEl) dkkEl.textContent = fmt(fixedTotal * pct / 100);
+      var bar = document.getElementById('bar-' + t);
+      if (bar) bar.style.width = pct + '%';
+    });
+    var badge = document.getElementById('tab-sum-badge');
+    var warn  = document.getElementById('tab-warning');
+    var disp  = document.getElementById('tab-sum-display');
+    var ok = Math.abs(tabSum - 100) < 1;
+    if (badge) { badge.textContent = tabSum + '%'; badge.className = 'badge ' + (ok ? 'badge-green' : 'badge-red'); }
+    if (warn)  warn.classList.toggle('hidden', ok);
+    if (disp)  disp.textContent = tabSum;
+  }
+
+  window.onTabSlider = function() { updateAll(); };
+
+  window.saveFixedAlloc = function() {
+    var inputs = document.getElementById('fixedForm').querySelectorAll('input[name]');
+    var tabs = {};
+    inputs.forEach(function(inp) {
+      var m = inp.name.match(/^tabs\[(\w+)\]$/);
+      if (m) tabs[m[1]] = Number(inp.value);
+    });
+
+    var btn = document.getElementById('saveBtn');
+    var fb  = document.getElementById('saveFeedback');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch('/api/fixed-costs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tabs: tabs, month: monthKey }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Save Allocations';
+      if (d.ok) {
+        fb.textContent = '✓ Saved';
+        fb.className = 'save-feedback save-ok';
+        setTimeout(function() { fb.className = 'save-feedback hidden'; }, 4000);
+      } else {
+        fb.textContent = '✗ ' + (d.error || 'Save failed');
+        fb.className = 'save-feedback save-err';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Save Allocations';
+      fb.textContent = '✗ Network error';
+      fb.className = 'save-feedback save-err';
+    });
+  };
+
+  updateAll();
+})();
+</script>
+
+<%- include('footer') %>

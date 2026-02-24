@@ -737,3 +737,134 @@ body {
 .cf-trend-icon.positive { color: #16a34a; }
 .cf-trend-icon.negative { color: #dc2626; }
 .cf-canvas-wrap { height: 220px; position: relative; }
+
+/* ── Month navigation (Labour + Fixed Costs pages) ── */
+.month-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* ── Fixed Costs allocation badge on dashboard card ── */
+.alloc-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #ede9fe;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+
+/* ── Distribution badges on cost categories ── */
+.dist-badge {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.dist-carry-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: #b45309;
+  background: #fef3c7;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.dist-from-badge {
+  font-size: 0.625rem;
+  color: #b45309;
+  background: #fef3c7;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 4px;
+}
+
+/* ── Category settings button ── */
+.cat-settings-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  margin-left: 4px;
+}
+.cat-settings-btn:hover { background: #f1f5f9; color: #1e3a5f; }
+
+/* ── Category settings panel ── */
+.cat-settings-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin: 4px 0 4px 1rem;
+  padding: 0.625rem 0.875rem;
+}
+.cat-settings-panel.hidden { display: none; }
+.cat-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.cat-settings-row label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #475569;
+  white-space: nowrap;
+}
+.dist-months-input {
+  width: 60px;
+  padding: 3px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+.dist-save-btn {
+  padding: 3px 10px;
+  border: none;
+  background: #1e3a5f;
+  color: #fff;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dist-save-btn:hover { background: #2d5282; }
+.dist-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.dist-help {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+}
+
+/* ── Distributed cost lines ── */
+.cost-line-distributed {
+  opacity: 0.72;
+  background: #fefce8;
+  border-left: 2px solid #f59e0b;
+  padding-left: 6px;
+}
+.mini-bar-distributed {
+  background: repeating-linear-gradient(
+    45deg,
+    #d97706,
+    #d97706 3px,
+    #fef3c7 3px,
+    #fef3c7 7px
+  ) !important;
+}
